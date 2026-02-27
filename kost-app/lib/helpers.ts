@@ -103,5 +103,10 @@ Pemakaian Listrik:
 
 Total Tagihan: Rp ${formatNumber(total_amount)}
 
-Mohon untuk melakukan pembayaran sesuai jumlah di atas. Terima kasih!`;
+Mohon untuk melakukan pembayaran sesuai jumlah di atas. Terima kasih!
+
+I KOMANG OKTARAMA BA
+Bank Mandiri
+1450013849266
+`;
 }
