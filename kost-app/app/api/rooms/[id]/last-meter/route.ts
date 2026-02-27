@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { readData } from "@/lib/db";
-
-export const runtime = "nodejs";
+import { getPrevMonthMeterEnd } from "@/lib/db";
 
 // GET /api/rooms/[id]/last-meter?month=2&year=2026
-// Mengembalikan angka meteran akhir dari bulan sebelumnya untuk dijadikan meter_start
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -24,21 +21,19 @@ export async function GET(
 
     const prevMonth = month === 1 ? 12 : month - 1;
     const prevYear = month === 1 ? year - 1 : year;
-
-    const data = readData();
-    const prevBill = data.bills.find(
-      (b) => b.room_id === id && b.month === prevMonth && b.year === prevYear
-    );
+    const meterEnd = await getPrevMonthMeterEnd(id, month, year);
 
     return NextResponse.json({
       room_id: id,
       prev_month: prevMonth,
       prev_year: prevYear,
-      meter_end: prevBill?.meter_end ?? null,  // null = belum ada riwayat
+      meter_end: meterEnd,
     });
-  } catch {
+  } catch (err) {
+    console.error("GET /api/rooms/[id]/last-meter error:", err);
+    const message = err instanceof Error ? err.message : String(err);
     return NextResponse.json(
-      { error: "Gagal membaca data meteran" },
+      { error: `Gagal membaca data meteran: ${message}` },
       { status: 500 }
     );
   }
