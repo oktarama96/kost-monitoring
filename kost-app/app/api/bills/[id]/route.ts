@@ -1,12 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
-import { updateBillPaidStatus, deleteBill } from "@/lib/db";
+import { updateBillStatus, deleteBill } from "@/lib/db";
+import { auth } from "@/auth";
 
-// PATCH /api/bills/[id] — toggle atau set status is_paid
+// PATCH /api/bills/[id] — set status paid/unpaid (tidak bisa mengubah expired)
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const { id } = await params;
     const body = await req.json();
 
@@ -17,10 +23,14 @@ export async function PATCH(
       );
     }
 
-    const updated = await updateBillPaidStatus(id, body.is_paid);
+    const newStatus = body.is_paid ? "paid" : "unpaid";
+    const updated = await updateBillStatus(id, newStatus);
 
     if (!updated) {
-      return NextResponse.json({ error: "Tagihan tidak ditemukan" }, { status: 404 });
+      return NextResponse.json(
+        { error: "Tagihan tidak ditemukan atau sudah berstatus kedaluwarsa" },
+        { status: 404 }
+      );
     }
 
     return NextResponse.json(updated);
@@ -40,6 +50,11 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const { id } = await params;
     const deleted = await deleteBill(id);
 

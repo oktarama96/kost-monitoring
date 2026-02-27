@@ -1,16 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getBills, getPrevMonthMeterEnd, upsertBill } from "@/lib/db";
+import { getBills, getPrevMonthMeterEnd, upsertBill, getActiveTenant, getKostByUserId } from "@/lib/db";
 import { Bill } from "@/lib/types";
 import { calculateBillAmount, generateBillId } from "@/lib/helpers";
+import { auth } from "@/auth";
 
 // GET /api/bills?month=2&year=2026
 export async function GET(req: NextRequest) {
   try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const kost = await getKostByUserId(session.user.id);
+    if (!kost) {
+      return NextResponse.json({ error: "Kost tidak ditemukan" }, { status: 404 });
+    }
+
     const { searchParams } = new URL(req.url);
     const month = searchParams.get("month");
     const year = searchParams.get("year");
 
-    const bills = await getBills({
+    const bills = await getBills(kost.id, {
       ...(month && { month: Number(month) }),
       ...(year && { year: Number(year) }),
     });
@@ -26,6 +37,16 @@ export async function GET(req: NextRequest) {
 // Body: { month, year, entries: [{ room_id, meter_end, meter_start_override? }] }
 export async function POST(req: NextRequest) {
   try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const kost = await getKostByUserId(session.user.id);
+    if (!kost) {
+      return NextResponse.json({ error: "Kost tidak ditemukan" }, { status: 404 });
+    }
+
     const body = await req.json();
     const { month, year, entries } = body;
 
@@ -45,7 +66,6 @@ export async function POST(req: NextRequest) {
 
       const meterEnd = Number(meter_end);
 
-      // Ambil meter_start dari tagihan bulan lalu
       const prevMeterEnd = await getPrevMonthMeterEnd(room_id, Number(month), Number(year));
       const meterStart = prevMeterEnd !== null
         ? prevMeterEnd
@@ -60,19 +80,19 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      // Ambil data room untuk kalkulasi — embedded di getBills tapi kita butuh room langsung
-      // Gunakan SQL via sql helper di db, atau cukup import getRoomById
       const { getRoomById } = await import("@/lib/db");
       const room = await getRoomById(room_id);
       if (!room) continue;
+
+      // Snapshot nama penghuni aktif saat tagihan dibuat
+      const activeTenant = await getActiveTenant(room_id);
+      const tenantSnapshotName = activeTenant?.name ?? null;
 
       const kwhUsed = meterEnd - meterStart;
       const totalAmount = calculateBillAmount(kwhUsed, room);
       const billId = generateBillId(Number(month), Number(year), room_id);
 
-      // Cek apakah ini insert baru atau update — upsertBill handles keduanya
-      // Untuk menentukan created vs updated, cek apakah bill sudah ada
-      const existingBills = await getBills({ month: Number(month), year: Number(year) });
+      const existingBills = await getBills(kost.id, { month: Number(month), year: Number(year) });
       const isExisting = existingBills.some((b) => b.room_id === room_id);
 
       const bill: Bill = {
@@ -84,7 +104,8 @@ export async function POST(req: NextRequest) {
         meter_end: meterEnd,
         kwh_used: kwhUsed,
         total_amount: totalAmount,
-        is_paid: false,
+        status: "unpaid",
+        tenant_snapshot_name: tenantSnapshotName,
       };
 
       const saved = await upsertBill(bill);
