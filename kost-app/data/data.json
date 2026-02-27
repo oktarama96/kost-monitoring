@@ -31,6 +31,8 @@
       "room_id": "room-01",
       "month": 2,
       "year": 2026,
+      "meter_start": 1230,
+      "meter_end": 1275,
       "kwh_used": 45,
       "total_amount": 1640000,
       "is_paid": false
@@ -40,17 +42,21 @@
       "room_id": "room-02",
       "month": 2,
       "year": 2026,
+      "meter_start": 870,
+      "meter_end": 900,
       "kwh_used": 30,
       "total_amount": 1325000,
       "is_paid": true
     },
     {
-      "id": "bill-022026-room03",
-      "room_id": "room-03",
-      "month": 2,
+      "id": "bill-032026-room01",
+      "room_id": "room-01",
+      "month": 3,
       "year": 2026,
-      "kwh_used": 55,
-      "total_amount": 1660000,
+      "meter_start": 1275,
+      "meter_end": 1325,
+      "kwh_used": 50,
+      "total_amount": 1650000,
       "is_paid": false
     }
   ]

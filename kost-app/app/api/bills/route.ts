@@ -17,6 +17,8 @@ export async function GET(req: NextRequest) {
       bills = bills.filter(
         (b) => b.month === Number(month) && b.year === Number(year)
       );
+    } else if (year) {
+      bills = bills.filter((b) => b.year === Number(year));
     }
 
     // Gabungkan data room ke setiap tagihan
@@ -34,8 +36,9 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// POST /api/bills — buat tagihan baru / batch input tagihan sebulan
-// Body: { month, year, entries: [{ room_id, kwh_used }] }
+// POST /api/bills — buat/update tagihan sebulan secara batch
+// Body: { month, year, entries: [{ room_id, meter_end }] }
+// meter_start otomatis diambil dari meter_end tagihan bulan sebelumnya
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -53,13 +56,48 @@ export async function POST(req: NextRequest) {
     const updatedBills: Bill[] = [];
 
     for (const entry of entries) {
-      const { room_id, kwh_used } = entry;
-      if (!room_id || kwh_used == null) continue;
+      const { room_id, meter_end, meter_start_override } = entry;
+      if (!room_id || meter_end == null) continue;
 
       const room = data.rooms.find((r) => r.id === room_id);
       if (!room) continue;
 
-      const totalAmount = calculateBillAmount(Number(kwh_used), room);
+      const meterEnd = Number(meter_end);
+
+      // Cari meter_start: ambil meter_end dari tagihan bulan sebelumnya.
+      // Jika tidak ada tagihan bulan lalu, pakai meter_start_override jika dikirim,
+      // atau fallback ke 0 (kamar baru / bulan pertama).
+      let meterStart = 0;
+
+      // Hitung bulan & tahun sebelumnya
+      const prevMonth = Number(month) === 1 ? 12 : Number(month) - 1;
+      const prevYear = Number(month) === 1 ? Number(year) - 1 : Number(year);
+
+      const prevBill = data.bills.find(
+        (b) =>
+          b.room_id === room_id &&
+          b.month === prevMonth &&
+          b.year === prevYear
+      );
+
+      if (prevBill) {
+        meterStart = prevBill.meter_end;
+      } else if (meter_start_override != null) {
+        // Fallback manual: user bisa kirim meter_start_override untuk bulan pertama
+        meterStart = Number(meter_start_override);
+      }
+
+      if (meterEnd < meterStart) {
+        return NextResponse.json(
+          {
+            error: `Angka meteran akhir (${meterEnd}) tidak boleh lebih kecil dari meteran awal (${meterStart}) untuk kamar ${room.room_name}`,
+          },
+          { status: 400 }
+        );
+      }
+
+      const kwhUsed = meterEnd - meterStart;
+      const totalAmount = calculateBillAmount(kwhUsed, room);
       const billId = generateBillId(Number(month), Number(year), room_id);
 
       // Cek apakah tagihan untuk bulan ini sudah ada
@@ -71,10 +109,12 @@ export async function POST(req: NextRequest) {
       );
 
       if (existingIndex !== -1) {
-        // Update tagihan yang sudah ada
+        // Update tagihan yang sudah ada (pertahankan is_paid)
         data.bills[existingIndex] = {
           ...data.bills[existingIndex],
-          kwh_used: Number(kwh_used),
+          meter_start: meterStart,
+          meter_end: meterEnd,
+          kwh_used: kwhUsed,
           total_amount: totalAmount,
         };
         updatedBills.push(data.bills[existingIndex]);
@@ -85,7 +125,9 @@ export async function POST(req: NextRequest) {
           room_id,
           month: Number(month),
           year: Number(year),
-          kwh_used: Number(kwh_used),
+          meter_start: meterStart,
+          meter_end: meterEnd,
+          kwh_used: kwhUsed,
           total_amount: totalAmount,
           is_paid: false,
         };

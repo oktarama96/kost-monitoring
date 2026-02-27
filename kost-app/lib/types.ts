@@ -12,7 +12,9 @@ export interface Bill {
   room_id: string;
   month: number;
   year: number;
-  kwh_used: number;
+  meter_start: number;   // angka meteran bulan lalu (awal periode)
+  meter_end: number;     // angka meteran bulan ini (akhir periode)
+  kwh_used: number;      // hasil kalkulasi: meter_end - meter_start
   total_amount: number;
   is_paid: boolean;
 }

@@ -67,6 +67,8 @@ export function generateBillText(params: {
   year: number;
   base_price: number;
   monthly_fee: number;
+  meter_start: number;
+  meter_end: number;
   kwh_used: number;
   price_per_kwh: number;
   total_amount: number;
@@ -78,6 +80,8 @@ export function generateBillText(params: {
     year,
     base_price,
     monthly_fee,
+    meter_start,
+    meter_end,
     kwh_used,
     price_per_kwh,
     total_amount,
@@ -92,7 +96,10 @@ Harga Kamar: Rp ${formatNumber(base_price)}
 
 Iuran Bulanan: Rp ${formatNumber(monthly_fee)}
 
-Pemakaian Listrik (${kwh_used} kWh x Rp ${formatNumber(price_per_kwh)}): Rp ${formatNumber(electricityCost)}
+Pemakaian Listrik:
+  - Meteran awal : ${formatNumber(meter_start)} kWh
+  - Meteran akhir: ${formatNumber(meter_end)} kWh
+  - Pemakaian    : ${kwh_used} kWh x Rp ${formatNumber(price_per_kwh)} = Rp ${formatNumber(electricityCost)}
 
 Total Tagihan: Rp ${formatNumber(total_amount)}
 

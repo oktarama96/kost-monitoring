@@ -136,6 +136,8 @@ export default function BillingListPage() {
       year: bill.year,
       base_price: bill.room.base_price,
       monthly_fee: bill.room.monthly_fee,
+      meter_start: bill.meter_start,
+      meter_end: bill.meter_end,
       kwh_used: bill.kwh_used,
       price_per_kwh: bill.room.price_per_kwh,
       total_amount: bill.total_amount,
@@ -309,6 +311,7 @@ export default function BillingListPage() {
                     <TableHead>Kamar</TableHead>
                     <TableHead>Penyewa</TableHead>
                     <TableHead className="text-center">Periode</TableHead>
+                    <TableHead className="text-center">Meteran</TableHead>
                     <TableHead className="text-right">kWh</TableHead>
                     <TableHead className="text-right">Listrik</TableHead>
                     <TableHead className="text-right">Total</TableHead>
@@ -332,6 +335,15 @@ export default function BillingListPage() {
                         </TableCell>
                         <TableCell className="text-center text-sm text-slate-500">
                           {MONTH_NAMES[bill.month]}/{bill.year}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <span className="font-mono text-sm text-slate-500">
+                            {formatNumber(bill.meter_start)}
+                          </span>
+                          <span className="text-slate-300 mx-1">→</span>
+                          <span className="font-mono text-sm font-semibold text-slate-700">
+                            {formatNumber(bill.meter_end)}
+                          </span>
                         </TableCell>
                         <TableCell className="text-right">
                           {bill.kwh_used} kWh

@@ -21,7 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Zap, Save, RefreshCw, Calculator } from "lucide-react";
+import { Zap, Save, RefreshCw, Calculator, Info } from "lucide-react";
 import { toast } from "sonner";
 
 const currentYear = new Date().getFullYear();
@@ -29,7 +29,12 @@ const YEARS = [currentYear - 1, currentYear, currentYear + 1];
 
 interface RoomEntry {
   room: Room;
-  kwh_used: string;
+  // angka meteran akhir bulan ini (yang diinput user)
+  meter_end: string;
+  // angka meteran awal (otomatis dari tagihan bulan lalu)
+  meter_start: number | null;
+  // jika tidak ada riwayat, user harus isi meter_start manual
+  meter_start_override: string;
   existingBill?: Bill;
 }
 
@@ -53,17 +58,40 @@ export default function BillingInputPage() {
       const rooms: Room[] = await roomsRes.json();
       const bills: (Bill & { room?: Room })[] = await billsRes.json();
 
-      const newEntries: RoomEntry[] = rooms.map((room) => {
+      // Untuk setiap kamar, ambil meter_end bulan sebelumnya secara paralel
+      const prevMeterResults = await Promise.all(
+        rooms.map((room) =>
+          fetch(
+            `/api/rooms/${room.id}/last-meter?month=${selectedMonth}&year=${selectedYear}`
+          ).then((r) => r.json())
+        )
+      );
+
+      const newEntries: RoomEntry[] = rooms.map((room, i) => {
         const existingBill = bills.find((b) => b.room_id === room.id);
+        const prevMeter = prevMeterResults[i];
+
         return {
           room,
-          kwh_used: existingBill ? String(existingBill.kwh_used) : "",
+          // Jika tagihan bulan ini sudah ada, tampilkan meter_end yang tersimpan
+          meter_end: existingBill ? String(existingBill.meter_end) : "",
+          // meter_start: dari tagihan bulan lalu, atau dari existingBill.meter_start
+          meter_start:
+            existingBill?.meter_start ??
+            (prevMeter.meter_end !== null ? prevMeter.meter_end : null),
+          meter_start_override:
+            existingBill?.meter_start != null &&
+            prevMeter.meter_end === null
+              ? String(existingBill.meter_start)
+              : "",
           existingBill: existingBill
             ? {
                 id: existingBill.id,
                 room_id: existingBill.room_id,
                 month: existingBill.month,
                 year: existingBill.year,
+                meter_start: existingBill.meter_start,
+                meter_end: existingBill.meter_end,
                 kwh_used: existingBill.kwh_used,
                 total_amount: existingBill.total_amount,
                 is_paid: existingBill.is_paid,
@@ -84,26 +112,50 @@ export default function BillingInputPage() {
     fetchData();
   }, [fetchData]);
 
-  function updateKwh(roomId: string, value: string) {
+  function updateMeterEnd(roomId: string, value: string) {
     setEntries((prev) =>
-      prev.map((e) => (e.room.id === roomId ? { ...e, kwh_used: value } : e))
+      prev.map((e) => (e.room.id === roomId ? { ...e, meter_end: value } : e))
+    );
+  }
+
+  function updateMeterStartOverride(roomId: string, value: string) {
+    setEntries((prev) =>
+      prev.map((e) =>
+        e.room.id === roomId ? { ...e, meter_start_override: value } : e
+      )
     );
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
-    const validEntries = entries
-      .filter((e) => e.kwh_used !== "" && Number(e.kwh_used) >= 0)
-      .map((e) => ({
-        room_id: e.room.id,
-        kwh_used: Number(e.kwh_used),
-      }));
+    const validEntries = entries.filter(
+      (e) => e.meter_end !== "" && Number(e.meter_end) >= 0
+    );
 
     if (validEntries.length === 0) {
-      toast.warning("Tidak ada data kWh yang diisi");
+      toast.warning("Tidak ada angka meteran yang diisi");
       return;
     }
+
+    // Validasi: kamar tanpa riwayat harus mengisi meter_start_override
+    const missingStart = validEntries.filter(
+      (e) => e.meter_start === null && e.meter_start_override === ""
+    );
+    if (missingStart.length > 0) {
+      toast.error(
+        `Mohon isi angka meteran awal untuk: ${missingStart.map((e) => e.room.room_name).join(", ")}`
+      );
+      return;
+    }
+
+    const payload = validEntries.map((e) => ({
+      room_id: e.room.id,
+      meter_end: Number(e.meter_end),
+      ...(e.meter_start === null && {
+        meter_start_override: Number(e.meter_start_override),
+      }),
+    }));
 
     setSubmitting(true);
     try {
@@ -113,7 +165,7 @@ export default function BillingInputPage() {
         body: JSON.stringify({
           month: Number(selectedMonth),
           year: Number(selectedYear),
-          entries: validEntries,
+          entries: payload,
         }),
       });
 
@@ -126,7 +178,7 @@ export default function BillingInputPage() {
       toast.success(
         `${result.created.length} tagihan baru dibuat, ${result.updated.length} diperbarui`
       );
-      fetchData(); // Refresh untuk tampilkan data terbaru
+      fetchData();
     } catch (err) {
       toast.error(String(err));
     } finally {
@@ -134,7 +186,7 @@ export default function BillingInputPage() {
     }
   }
 
-  const filledCount = entries.filter((e) => e.kwh_used !== "").length;
+  const filledCount = entries.filter((e) => e.meter_end !== "").length;
 
   return (
     <div className="space-y-6">
@@ -142,7 +194,8 @@ export default function BillingInputPage() {
       <div>
         <h1 className="text-3xl font-bold text-slate-900">Input Tagihan</h1>
         <p className="text-slate-500 mt-1">
-          Masukkan pemakaian listrik (kWh) per kamar untuk periode yang dipilih
+          Masukkan angka meteran listrik saat ini per kamar. Pemakaian kWh
+          dihitung otomatis dari selisih meteran bulan lalu.
         </p>
       </div>
 
@@ -204,7 +257,7 @@ export default function BillingInputPage() {
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle>
-                  Input kWh — {MONTH_NAMES[Number(selectedMonth)]}{" "}
+                  Meteran Listrik — {MONTH_NAMES[Number(selectedMonth)]}{" "}
                   {selectedYear}
                 </CardTitle>
                 <CardDescription>
@@ -227,7 +280,7 @@ export default function BillingInputPage() {
                 {[1, 2, 3].map((i) => (
                   <div
                     key={i}
-                    className="h-20 bg-slate-100 rounded-lg animate-pulse"
+                    className="h-24 bg-slate-100 rounded-lg animate-pulse"
                   />
                 ))}
               </div>
@@ -238,19 +291,36 @@ export default function BillingInputPage() {
             ) : (
               <div className="space-y-3">
                 {entries.map((entry) => {
-                  const kwhNum = Number(entry.kwh_used);
-                  const estimatedTotal =
-                    entry.kwh_used !== "" && !isNaN(kwhNum)
-                      ? calculateBillAmount(kwhNum, entry.room)
+                  const isPaid = entry.existingBill?.is_paid;
+                  const isExisting = !!entry.existingBill;
+
+                  // Hitung preview kWh dan total
+                  const meterEndNum = Number(entry.meter_end);
+                  const meterStartNum =
+                    entry.meter_start !== null
+                      ? entry.meter_start
+                      : entry.meter_start_override !== ""
+                        ? Number(entry.meter_start_override)
+                        : null;
+
+                  const kwhPreview =
+                    entry.meter_end !== "" &&
+                    meterStartNum !== null &&
+                    meterEndNum >= meterStartNum
+                      ? meterEndNum - meterStartNum
                       : null;
 
-                  const isExisting = !!entry.existingBill;
-                  const isPaid = entry.existingBill?.is_paid;
+                  const totalPreview =
+                    kwhPreview !== null
+                      ? calculateBillAmount(kwhPreview, entry.room)
+                      : null;
+
+                  const hasNoPrevHistory = entry.meter_start === null;
 
                   return (
                     <div
                       key={entry.room.id}
-                      className={`flex flex-col sm:flex-row sm:items-center gap-4 p-4 rounded-lg border transition-colors ${
+                      className={`p-4 rounded-lg border transition-colors ${
                         isPaid
                           ? "bg-green-50 border-green-200"
                           : isExisting
@@ -258,72 +328,121 @@ export default function BillingInputPage() {
                             : "bg-white border-slate-200"
                       }`}
                     >
-                      {/* Room Info */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <p className="font-semibold text-slate-800">
-                            {entry.room.room_name}
+                      <div className="flex flex-col sm:flex-row sm:items-start gap-4">
+                        {/* Room Info */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className="font-semibold text-slate-800">
+                              {entry.room.room_name}
+                            </p>
+                            {isExisting && (
+                              <Badge
+                                variant={isPaid ? "default" : "secondary"}
+                                className={
+                                  isPaid ? "bg-green-600 text-xs" : "text-xs"
+                                }
+                              >
+                                {isPaid ? "Lunas" : "Sudah Ada"}
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-sm text-slate-500">
+                            {entry.room.tenant_name}
                           </p>
-                          {isExisting && (
-                            <Badge
-                              variant={isPaid ? "default" : "secondary"}
-                              className={
-                                isPaid ? "bg-green-600 text-xs" : "text-xs"
-                              }
-                            >
-                              {isPaid ? "Lunas" : "Sudah Ada"}
-                            </Badge>
-                          )}
-                        </div>
-                        <p className="text-sm text-slate-500">
-                          {entry.room.tenant_name}
-                        </p>
-                        <p className="text-xs text-slate-400 mt-0.5">
-                          Tarif: {formatRupiah(entry.room.base_price)} + iuran{" "}
-                          {formatRupiah(entry.room.monthly_fee)} +{" "}
-                          {formatRupiah(entry.room.price_per_kwh)}/kWh
-                        </p>
-                      </div>
-
-                      {/* kWh Input */}
-                      <div className="flex items-center gap-3">
-                        <div className="space-y-1">
-                          <Label
-                            htmlFor={`kwh-${entry.room.id}`}
-                            className="text-xs"
-                          >
-                            <Zap size={11} className="inline mr-1" />
-                            Pemakaian (kWh)
-                          </Label>
-                          <Input
-                            id={`kwh-${entry.room.id}`}
-                            type="number"
-                            placeholder="0"
-                            value={entry.kwh_used}
-                            onChange={(e) =>
-                              updateKwh(entry.room.id, e.target.value)
-                            }
-                            min={0}
-                            className="w-28 text-right"
-                            disabled={isPaid}
-                          />
+                          <p className="text-xs text-slate-400 mt-0.5">
+                            {formatRupiah(entry.room.base_price)} + iuran{" "}
+                            {formatRupiah(entry.room.monthly_fee)} +{" "}
+                            {formatRupiah(entry.room.price_per_kwh)}/kWh
+                          </p>
                         </div>
 
-                        {/* Estimated Total */}
-                        <div className="text-right min-w-32">
-                          {estimatedTotal !== null ? (
-                            <div>
-                              <div className="flex items-center gap-1 text-xs text-slate-400 justify-end">
-                                <Calculator size={11} />
-                                Estimasi Total
+                        {/* Meter Inputs */}
+                        <div className="flex flex-wrap items-end gap-3">
+                          {/* Meteran Awal (meter_start) */}
+                          <div className="space-y-1">
+                            <Label className="text-xs text-slate-500">
+                              Meteran Awal
+                            </Label>
+                            {hasNoPrevHistory ? (
+                              // Tidak ada riwayat bulan lalu — user isi manual
+                              <div className="space-y-1">
+                                <Input
+                                  type="number"
+                                  placeholder="Isi manual"
+                                  value={entry.meter_start_override}
+                                  onChange={(e) =>
+                                    updateMeterStartOverride(
+                                      entry.room.id,
+                                      e.target.value
+                                    )
+                                  }
+                                  min={0}
+                                  className="w-28 text-right border-amber-300 focus-visible:ring-amber-400"
+                                  disabled={isPaid}
+                                />
+                                <p className="text-xs text-amber-600 flex items-center gap-1">
+                                  <Info size={10} />
+                                  Bulan pertama
+                                </p>
                               </div>
-                              <p className="font-bold text-slate-800">
-                                {formatRupiah(estimatedTotal)}
+                            ) : (
+                              // Ada riwayat — tampilkan otomatis, tidak bisa diedit
+                              <div className="w-28 h-9 flex items-center justify-end px-3 bg-slate-100 rounded-md border border-slate-200 text-sm font-mono font-semibold text-slate-600">
+                                {entry.meter_start}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Tanda panah pemisah */}
+                          <div className="pb-1.5 text-slate-400 font-bold text-lg">
+                            →
+                          </div>
+
+                          {/* Meteran Akhir (input utama) */}
+                          <div className="space-y-1">
+                            <Label
+                              htmlFor={`meter-end-${entry.room.id}`}
+                              className="text-xs font-semibold flex items-center gap-1"
+                            >
+                              <Zap size={10} className="text-yellow-500" />
+                              Meteran Sekarang
+                            </Label>
+                            <Input
+                              id={`meter-end-${entry.room.id}`}
+                              type="number"
+                              placeholder="0"
+                              value={entry.meter_end}
+                              onChange={(e) =>
+                                updateMeterEnd(entry.room.id, e.target.value)
+                              }
+                              min={0}
+                              className="w-32 text-right font-mono"
+                              disabled={isPaid}
+                            />
+                          </div>
+
+                          {/* Preview kWh & Total */}
+                          <div className="text-right min-w-36 pb-0.5">
+                            {kwhPreview !== null ? (
+                              <div>
+                                <div className="flex items-center gap-1 text-xs text-slate-400 justify-end">
+                                  <Calculator size={11} />
+                                  {kwhPreview} kWh
+                                </div>
+                                <p className="font-bold text-slate-800 text-base">
+                                  {formatRupiah(totalPreview!)}
+                                </p>
+                              </div>
+                            ) : entry.meter_end !== "" &&
+                              meterStartNum !== null &&
+                              meterEndNum < meterStartNum ? (
+                              <p className="text-xs text-red-500 font-medium">
+                                Meteran akhir lebih kecil dari awal
                               </p>
-                            </div>
-                          ) : (
-                            <p className="text-slate-300 text-sm">—</p>
-                          )}
+                            ) : (
+                              <p className="text-slate-300 text-sm">—</p>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
