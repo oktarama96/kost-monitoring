@@ -2,157 +2,188 @@
 
 ## What Is This Project?
 
-**KostManager** is an internal web application for managing a Indonesian boarding house (*kost*). It handles room management, monthly electricity billing, payment tracking, and tenant bill generation.
+**KostManager** is a **multi-tenant SaaS** web application for managing Indonesian boarding houses (*kost*). Each owner account manages one kost. A **SuperAdmin** role manages all owner accounts.
 
-This is a **Next.js 16 (App Router)** application using **TypeScript**, **Tailwind CSS v4**, **shadcn/ui**, and **Vercel Postgres (PostgreSQL)**. It is deployed on Vercel. There is no authentication system — it is a private, single-tenant internal tool.
+**Stack:** Next.js 16 (App Router) · TypeScript · Tailwind CSS v4 · shadcn/ui · Vercel Postgres · NextAuth.js v5
 
-**Reference Documents** (always consult before making changes):
-- [`SPECS.md`](./SPECS.md) — Full business logic, feature specifications, and domain rules
-- [`ARCHITECTURE.md`](./ARCHITECTURE.md) — Project structure, data flow, API reference, DB schema, and key files
+**Always read these first before making any changes:**
+- [`SPECS.md`](./SPECS.md) — Business logic, feature specs, domain rules, user roles
+- [`ARCHITECTURE.md`](./ARCHITECTURE.md) — File structure, DB schema, API reference, auth flow, data flow
 
 ---
 
-## Mandatory Sync Rule
+## 🔴 Mandatory Sync Rule
 
-> **If you make ANY change to this codebase — whether adding features, fixing bugs, refactoring, or modifying data models — you MUST update `SPECS.md` and `ARCHITECTURE.md` to reflect those changes before considering the task complete.**
+> **After ANY change to the codebase — feature, bug fix, refactor, or schema change — you MUST update `SPECS.md` and `ARCHITECTURE.md` to reflect those changes before considering the task complete.**
 
-This is non-negotiable. Outdated documentation is worse than no documentation. Specifically:
+Specific update triggers:
 
-- **New or changed feature/behavior** → Update the relevant section(s) in `SPECS.md`
-- **New file, route, module, or component** → Update the directory tree and relevant sections in `ARCHITECTURE.md`
-- **Database schema change** → Update Section 6 (Database Schema) in `ARCHITECTURE.md` and Section 3 (Core Business Rules) or Section 4 (Feature Specifications) in `SPECS.md` as appropriate
-- **New API endpoint** → Update Section 7 (API Routes Reference) in `ARCHITECTURE.md`
-- **New environment variable or external service** → Update Section 10 (Environment & Deployment) in `ARCHITECTURE.md`
-- **New business rule or constraint** → Update Section 3 or Section 9 in `SPECS.md`
-- **New npm dependency** → Update Section 1 (Technology Stack) in `ARCHITECTURE.md`
+| Change Type | Update Target |
+|---|---|
+| New or changed feature / behavior | Relevant section in `SPECS.md` |
+| New file, route, module, or component | Directory tree + relevant sections in `ARCHITECTURE.md` |
+| Database schema change | Section 4 (DB Schema) in `ARCHITECTURE.md` + Section 3 or 5 in `SPECS.md` |
+| New API endpoint | Section 7 (API Routes) in `ARCHITECTURE.md` |
+| New env variable or external service | Section 10 (Environment) in `ARCHITECTURE.md` |
+| New business rule or constraint | Section 3 or 10 in `SPECS.md` |
+| New npm dependency | Section 1 (Tech Stack) in `ARCHITECTURE.md` |
+| New user role or auth rule | Section 4 (Roles) in `SPECS.md` + Section 5 (Auth) in `ARCHITECTURE.md` |
 
 ---
 
 ## Codebase Quick Reference
 
-### Entry Points
-- `app/layout.tsx` — Root layout (Navbar + Toaster)
-- `app/page.tsx` — Dashboard (Server Component, SSR)
-- `app/rooms/page.tsx` — Room CRUD (Client Component)
-- `app/billing/page.tsx` — Meter input (Client Component)
-- `app/billing-list/page.tsx` — Bill management (Client Component)
+### Layout & Entry Points
+
+| Path | Description |
+|---|---|
+| `app/layout.tsx` | Minimal root layout — Providers + Toaster only, **NO Navbar** |
+| `app/(owner)/layout.tsx` | Owner route group layout — wraps with Navbar + main container |
+| `app/(owner)/page.tsx` | Dashboard (Server Component, SSR) |
+| `app/(owner)/rooms/page.tsx` | Room + tenant management (Client) |
+| `app/(owner)/billing/page.tsx` | Meter input (Client) |
+| `app/(owner)/billing-list/page.tsx` | Bill management (Client) |
+| `app/admin/layout.tsx` | Admin layout — **independent** header, no root Navbar nesting |
+| `app/admin/page.tsx` | Owner CRUD for SuperAdmin (Client) |
+| `app/login/page.tsx` | Login page (public) |
+| `app/register/page.tsx` | Registration page (public) |
 
 ### Core Logic Files
-- `lib/types.ts` — All TypeScript interfaces (`Room`, `Bill`, `BillWithRoom`)
-- `lib/db.ts` — All database queries (do not write raw SQL in route handlers)
-- `lib/helpers.ts` — Business logic: bill calculation, formatting, ID generation, bill text generation
-- `lib/utils.ts` — Tailwind class merger (`cn()`)
 
-### API Routes
-- `app/api/rooms/route.ts` — `GET`, `POST`
-- `app/api/rooms/[id]/route.ts` — `PUT`, `DELETE`
-- `app/api/rooms/[id]/last-meter/route.ts` — `GET`
-- `app/api/bills/route.ts` — `GET`, `POST` (upsert)
-- `app/api/bills/[id]/route.ts` — `PATCH`, `DELETE`
+| File | Purpose |
+|---|---|
+| `lib/types.ts` | All TypeScript interfaces (`User`, `Kost`, `Room`, `Tenant`, `Bill`, `OwnerWithKost`, etc.) |
+| `lib/db.ts` | **All** database queries — never write SQL directly in route handlers |
+| `lib/helpers.ts` | Pure business logic: bill calculation, formatting, ID generation, bill text |
+| `lib/utils.ts` | `cn()` Tailwind class merger |
+| `auth.ts` | NextAuth v5 config: Credentials provider, JWT callbacks (injects `id` + `role`) |
+| `middleware.ts` | Route protection + role-based access (owner vs superadmin) |
+| `types/next-auth.d.ts` | Module augmentation: adds `id` and `role` to `Session` and `JWT` |
 
-### UI Components
-- `components/Navbar.tsx` — Navigation bar
-- `components/ui/` — shadcn/ui primitives (Button, Card, Dialog, Form, Input, Select, Table, Badge, etc.)
+### API Structure
 
-### Database & Seeding
-- `scripts/schema.sql` — PostgreSQL DDL
-- `scripts/seed.ts` — Run with `npm run seed`
-- `data/data.json` — Static reference data (not used at runtime)
+```
+/api/auth/[...nextauth]      — NextAuth handler (public)
+/api/auth/register           — POST: create owner account (public)
+/api/admin/setup             — POST: create first superadmin (public, one-time)
+/api/admin/owners            — GET/POST: list/create owners (superadmin)
+/api/admin/owners/[id]       — PATCH/DELETE: update/delete owner (superadmin)
+/api/rooms                   — GET (w/ active_tenant)/POST: owner scoped
+/api/rooms/[id]              — PUT/DELETE
+/api/rooms/[id]/last-meter   — GET: previous month meter_end
+/api/rooms/[id]/checkin      — POST: check in new tenant
+/api/rooms/[id]/checkout     — POST: check out tenant + expire bills
+/api/rooms/[id]/tenants      — GET: tenant history
+/api/bills                   — GET/POST (upsert, snapshots tenant name)
+/api/bills/[id]              — PATCH (toggle paid/unpaid) / DELETE
+```
 
 ---
 
 ## Key Conventions
 
+### Authentication & Sessions
+- All owner API routes must call `const session = await auth()` and verify `session?.user?.id`.
+- SuperAdmin API routes additionally check `session.user.role === "superadmin"`.
+- Never trust client-supplied `kost_id` — always derive it from `getKostByUserId(session.user.id)`.
+
 ### Database Access
-- All SQL queries go in `lib/db.ts`. Route handlers call functions from `lib/db.ts` — they do NOT contain inline SQL.
+- **All SQL goes in `lib/db.ts`** — no inline SQL in route handlers or components.
 - Use the `sql` tagged template literal from `@vercel/postgres`.
-- Room IDs: `room-{timestamp}` format (e.g., `room-1706789123456`)
-- Bill IDs: deterministic `bill-{MM}{YYYY}-room{N}` format (generated by `generateBillId()` in `lib/helpers.ts`)
+- `getUserByEmail` must SELECT the `role` column.
+- Room IDs: `room-{timestamp}` | Bill IDs: `bill-{MM}{YYYY}-room{N}` (via `generateBillId()`)
+
+### Data Isolation (Multi-Tenancy)
+- Every room/bill query must be scoped by `kost_id`. Pass it from the session, not from the client.
+- `GET /api/rooms` returns rooms with embedded `active_tenant`.
+
+### Tenant Lifecycle
+- Check-in: `POST /api/rooms/[id]/checkin` → `checkinTenant()` in db.ts
+- Check-out: `POST /api/rooms/[id]/checkout` → `checkoutTenant()` → also expires unpaid bills
+- Active tenant = record with `check_out_date IS NULL`
+
+### Bill Status
+- `status` is a `VARCHAR(16)`: `'unpaid'` | `'paid'` | `'expired'`
+- `expired` bills cannot be toggled. Block in both API (`PATCH /api/bills/[id]`) and UI.
+- On bill creation, snapshot the active tenant's name into `tenant_snapshot_name`.
 
 ### Business Logic
-- All calculations (kWh, total amount) go in `lib/helpers.ts` — not in components or route handlers.
-- The core formula: `total_amount = base_price + monthly_fee + (kwh_used * price_per_kwh)`
-- A room is considered **vacant** when `tenant_name === "Kosong"`.
-- Bills are **upserted** (not duplicated) using `ON CONFLICT (id) DO UPDATE`.
-- A bill with `is_paid = true` must **never be overwritten** from the billing input page.
+- `total_amount = base_price + monthly_fee + (kwh_used × price_per_kwh)` — always via `calculateBillAmount()` in `helpers.ts`.
+- Bills are upserted via `ON CONFLICT (room_id, month, year) DO UPDATE`.
 
 ### API Patterns
-- All API responses use `NextResponse.json(data, { status: N })`.
-- Error responses: `{ error: string }` with appropriate 4xx/5xx status.
-- 404 responses when a room or bill ID is not found.
+- Responses: `NextResponse.json(data, { status: N })`
+- Errors: `{ error: string }` with 4xx/5xx HTTP status
+- Auth failures: 401 Unauthorized | Role failures: 403 Forbidden
 
 ### Component Patterns
-- Use `"use client"` directive for interactive pages and components.
-- Use shadcn/ui components from `components/ui/` — do not install alternative UI libraries unless necessary.
-- Use `sonner` (via `components/ui/sonner.tsx`) for toast notifications — `toast.success()`, `toast.error()`.
-- Use React Hook Form + Zod for all form handling and validation.
-- Import path alias: `@/` maps to the project root (e.g., `import { cn } from "@/lib/utils"`).
+- Interactive pages: `"use client"` at the top
+- shadcn/ui only — no alternate UI libraries
+- Toast: `toast.success()` / `toast.error()` via Sonner
+- Import alias: `@/` = project root
 
-### Styling
-- Use Tailwind CSS utility classes exclusively.
-- Do not write custom CSS except in `app/globals.css` for design tokens/variables.
-- Use the `cn()` helper for conditional class merging.
-- Dark mode is supported via CSS variables — do not hardcode colors.
-
-### Localization
-- UI text is in **Bahasa Indonesia**.
-- Currency: IDR — always use `formatRupiah()` from `lib/helpers.ts` for display.
-- Month names: use the `MONTH_NAMES` array from `lib/helpers.ts`.
-
----
-
-## What NOT to Do
-
-- Do NOT add authentication/login without updating `SPECS.md` Section 9 (Known Constraints) and `ARCHITECTURE.md`
-- Do NOT write SQL directly in route handlers — always add a function to `lib/db.ts` first
-- Do NOT hardcode monetary values or business rates in components — they belong in the database per-room
-- Do NOT duplicate business logic — `calculateBillAmount()` in `lib/helpers.ts` is the single source of truth for bill calculation
-- Do NOT create new UI component libraries — extend `components/ui/` with shadcn/ui components
-- Do NOT modify `is_paid` via the billing input (`POST /api/bills`) — payment status is managed only via `PATCH /api/bills/[id]`
-- Do NOT forget to update `SPECS.md` and `ARCHITECTURE.md` after any change
+### Route Groups
+- `app/(owner)/` — Next.js route group, URL is unaffected (e.g., `/(owner)/rooms` serves `/rooms`)
+- Adding a new owner page: create under `app/(owner)/` not `app/` root
+- `app/admin/` is a standalone segment with its own independent layout
 
 ---
 
 ## Adding New Features — Checklist
 
-When implementing a new feature, follow this checklist:
-
-1. **Read `SPECS.md`** — understand related business rules before writing code
-2. **Read `ARCHITECTURE.md`** — understand where the new code belongs
-3. **Plan the data model** — does a schema change to `scripts/schema.sql` need to happen?
-4. **Add DB functions** to `lib/db.ts` before writing route handlers
-5. **Add business logic** to `lib/helpers.ts` (pure functions, no DB calls)
+1. **Read `SPECS.md`** — understand business rules before writing code
+2. **Read `ARCHITECTURE.md`** — understand where new code belongs
+3. **Plan DB changes** — add to `scripts/migrate.sql` if schema changes
+4. **Add DB functions** to `lib/db.ts` (before route handlers)
+5. **Add business logic** to `lib/helpers.ts` (pure functions)
 6. **Add/update API routes** in `app/api/`
-7. **Build the UI** in `app/` pages using shadcn/ui components
-8. **Update `SPECS.md`** with the new feature specification
-9. **Update `ARCHITECTURE.md`** with any structural changes (files, routes, schema, dependencies)
+7. **Build UI** under `app/(owner)/` (owner pages) or `app/admin/` (admin pages)
+8. **✅ Update `SPECS.md`** with new feature spec
+9. **✅ Update `ARCHITECTURE.md`** with structural changes
 
 ---
 
 ## Common Tasks
 
 ### Add a New Room Field
-1. Add column to `scripts/schema.sql`
-2. Migrate existing DB (alter table or re-seed)
-3. Update `Room` interface in `lib/types.ts`
-4. Update `createRoom`, `updateRoom`, `getRooms` in `lib/db.ts`
-5. Update `POST /api/rooms` and `PUT /api/rooms/[id]` route handlers
-6. Update the room form UI in `app/rooms/page.tsx`
-7. Sync `SPECS.md` (Section 4.2) and `ARCHITECTURE.md` (Sections 5, 6)
+1. `scripts/migrate.sql` → `ALTER TABLE rooms ADD COLUMN ...`
+2. `lib/types.ts` → Update `Room` interface
+3. `lib/db.ts` → Update `createRoom`, `updateRoom`, `getRooms`
+4. `app/api/rooms/route.ts` and `app/api/rooms/[id]/route.ts`
+5. `app/(owner)/rooms/page.tsx` → Update form UI
+6. ✅ Sync `SPECS.md` (§5.3) and `ARCHITECTURE.md` (§4, §6)
 
-### Add a New Page
-1. Create `app/{page-name}/page.tsx`
-2. Add navigation link in `components/Navbar.tsx`
-3. Add any required API routes under `app/api/`
-4. Add DB functions to `lib/db.ts`
-5. Sync `ARCHITECTURE.md` (Sections 2, 3, 7, 8) and `SPECS.md` (Section 4 or 6)
-
-### Change the Bill Calculation Formula
-1. Update `calculateBillAmount()` in `lib/helpers.ts`
-2. Verify all callers: `app/api/bills/route.ts` and any live-preview code in `app/billing/page.tsx`
-3. Sync `SPECS.md` Section 3.1 (Core Business Rules — Bill Calculation)
+### Add a New Owner Page
+1. Create `app/(owner)/{page-name}/page.tsx`
+2. Add nav link in `components/Navbar.tsx`
+3. Add API routes under `app/api/`
+4. Add DB functions in `lib/db.ts`
+5. ✅ Sync `ARCHITECTURE.md` (§2 directory tree, §7 API, §8 rendering) and `SPECS.md` (§5)
 
 ### Add a New API Endpoint
-1. Create the route file under `app/api/`
-2. Add corresponding DB function(s) in `lib/db.ts`
-3. Sync `ARCHITECTURE.md` Section 7 (API Routes Reference)
+1. Create route file under `app/api/`
+2. Add DB function(s) in `lib/db.ts`
+3. ✅ Sync `ARCHITECTURE.md` §7 (API Routes Reference)
+
+### Change Bill Calculation
+1. Update `calculateBillAmount()` in `lib/helpers.ts`
+2. Verify callers: `app/api/bills/route.ts`, billing page live preview
+3. ✅ Sync `SPECS.md` §3.1
+
+### Modify Auth/Role Behavior
+1. Update `auth.ts` (callbacks) and/or `middleware.ts`
+2. If new role: update `types/next-auth.d.ts` + `lib/types.ts`
+3. ✅ Sync `SPECS.md` §4 and `ARCHITECTURE.md` §5
+
+---
+
+## What NOT to Do
+
+- ❌ Write SQL directly in route handlers — always use `lib/db.ts`
+- ❌ Trust client-supplied `kost_id` — derive from session
+- ❌ Toggle `expired` bills — blocked at API + UI level
+- ❌ Use `is_paid` — the field is `status` (string enum)
+- ❌ Read `tenant_name` from rooms — tenants are tracked in the `tenants` table
+- ❌ Create new owner pages under `app/` root — use `app/(owner)/`
+- ❌ Nest admin-specific UX inside the root layout — `app/admin/layout.tsx` is fully independent
+- ❌ Forget to update `SPECS.md` and `ARCHITECTURE.md` after any change

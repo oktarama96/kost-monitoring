@@ -2,15 +2,17 @@
 
 ## 1. Project Overview
 
-**KostManager** is an internal web application for managing a boarding house (*kost*) in Indonesia. It enables the property owner/manager to:
+**KostManager** is a **multi-tenant SaaS** web application for managing Indonesian boarding houses (*kost*). Each account represents one property (kost) manager. A **SuperAdmin** oversees all accounts.
 
-- Maintain a registry of rooms and their tenants
+Core capabilities per kost manager:
+- Register and manage rooms
+- Track tenant occupancy history (check-in / check-out)
 - Record monthly electricity meter readings per room
-- Automatically calculate monthly bills based on configurable room rates and electricity pricing
-- Track payment status for each bill
-- Generate copy-paste-ready billing messages to send to tenants (e.g., via WhatsApp)
+- Auto-calculate monthly bills based on configurable room rates
+- Track payment status per bill
+- Generate copy-paste billing messages (e.g., for WhatsApp)
 
-The system is **single-tenant**, **unauthenticated**, and intended for **internal use only** by the property owner.
+The system now requires **authentication** — all manager pages are protected by JWT sessions (NextAuth.js v5). Data is isolated per kost via `kost_id`.
 
 ---
 
@@ -18,18 +20,22 @@ The system is **single-tenant**, **unauthenticated**, and intended for **interna
 
 | Term | Meaning |
 |---|---|
-| **Kost** | Indonesian term for a boarding house / room rental |
+| **Kost** | An Indonesian boarding house / room rental property |
 | **Kamar** | Indonesian for "room" |
-| **Kosong** | Indonesian for "empty/vacant"; used as a sentinel tenant name for unoccupied rooms |
-| **Tagihan** | Indonesian for "bill/invoice" |
-| **Bayar / Belum Bayar** | Indonesian for "paid / not yet paid" |
+| **Penghuni** / **Tenant** | A person renting a room |
+| **Kosong** | Vacant (no active tenant) |
+| **Tagihan** | Bill / invoice |
+| **Lunas / Belum Lunas** | Paid / Unpaid |
+| **Kedaluwarsa / Expired** | Bill that was unpaid when the tenant checked out |
 | **kWh** | Kilowatt-hour; unit of electricity consumption |
-| **Meter Start** | Electricity meter reading at the beginning of the billing period |
-| **Meter End** | Electricity meter reading at the end of the billing period |
-| **Base Price** | Fixed monthly room rental fee (IDR) |
-| **Monthly Fee** | Fixed monthly utility/service charge added on top of base price (IDR) |
-| **Price per kWh** | Variable electricity rate charged to the tenant (IDR per kWh) |
-| **Total Amount** | The final computed bill amount: `base_price + monthly_fee + (kwh_used × price_per_kwh)` |
+| **Meter Start** | Electricity meter reading at start of billing period |
+| **Meter End** | Electricity meter reading at end of billing period |
+| **Base Price** | Fixed monthly rental fee (IDR) |
+| **Monthly Fee** | Fixed monthly utility/service charge (IDR) |
+| **Price per kWh** | Electricity rate charged to tenant (IDR per kWh) |
+| **Total Amount** | `base_price + monthly_fee + (kwh_used × price_per_kwh)` |
+| **Owner** | A kost manager with their own account and data |
+| **SuperAdmin** | Platform-level administrator who manages all owner accounts |
 
 ---
 
@@ -43,194 +49,137 @@ Electricity  = kWh Used × price_per_kwh
 Total Amount = base_price + monthly_fee + Electricity
 ```
 
-All monetary values are in **Indonesian Rupiah (IDR)**, stored as integers (no decimals).
+All monetary values are in **IDR**, stored as integers (no decimals).
 
-### 3.2 Room Vacancy
+### 3.2 Bill Status
 
-- A room with `tenant_name = "Kosong"` is considered **vacant**.
-- Vacant rooms are excluded from the "Not Yet Billed" alert on the dashboard.
-- Vacant rooms can still have bills created against them (the system does not block it), but the default UI workflow targets only occupied rooms.
+Bills have three possible statuses (`status` field — replaces the old `is_paid` boolean):
+
+| Status | Meaning |
+|---|---|
+| `unpaid` | Bill exists but has not been paid |
+| `paid` | Bill has been marked as paid |
+| `expired` | Bill was unpaid when the tenant checked out; no longer actionable |
+
+- `paid` bills are read-only in the billing input form.
+- `expired` bills show a grey "Kedaluwarsa" badge and cannot be toggled.
+- Only `paid` ↔ `unpaid` toggling is allowed via the billing list.
 
 ### 3.3 One Bill Per Room Per Month
 
-- Each room can have **at most one bill per calendar month/year** (enforced by a database `UNIQUE` constraint on `(room_id, month, year)`).
-- Saving a billing entry for an existing `(room_id, month, year)` combination performs an **upsert** (update in place), not a duplicate insert.
-- Bills that are **already paid** (`is_paid = true`) are **locked** in the billing input form — they are shown as read-only to prevent accidental overwriting of paid bills.
+- `UNIQUE (room_id, month, year)` constraint — one bill per room per calendar month.
+- Saving a bill for an existing period performs an **upsert**.
 
 ### 3.4 Meter Start Auto-Population
 
-- When entering a new bill for a given month/year, the system automatically looks up the **previous month's `meter_end`** for that room and pre-fills it as `meter_start`.
-- If no prior bill exists (e.g., the room is new or no previous billing period was recorded), the user is prompted to manually enter the `meter_start` value. This input is visually highlighted (amber) to draw attention.
+- On billing input, the previous month's `meter_end` is fetched and pre-filled as `meter_start`.
+- If none exists, the user must manually enter it (field highlighted in amber).
 
 ### 3.5 Deterministic Bill IDs
 
-- Bill IDs are generated deterministically using the format: `bill-{MM}{YYYY}-room{N}` (e.g., `bill-022026-room01`).
-- This deterministic ID is what enables the upsert: attempting to insert a bill with an existing ID triggers an `ON CONFLICT ... DO UPDATE` in the database.
+- Bill IDs: `bill-{MM}{YYYY}-room{N}` (e.g., `bill-022026-room01`).
+- Enables upsert via `ON CONFLICT (id) DO UPDATE`.
 
-### 3.6 Payment Status
+### 3.6 Tenant Snapshot on Bill Creation
 
-- All new and updated bills have `is_paid = false` by default.
-- Payment status can only be toggled from the **Billing List** page, not from the Billing Input page.
-- Payment toggling is a single-click action with no confirmation dialog (immediate optimistic-style action).
+- When a bill is created, the **active tenant's name** is captured in `tenant_snapshot_name`.
+- This preserves the billing record even after the tenant has checked out.
 
-### 3.7 Cascade Deletion
+### 3.7 Tenant Lifecycle
 
-- Deleting a room **permanently deletes all bills** associated with that room (foreign key `ON DELETE CASCADE`).
+- **Check-in**: Creates a new record in the `tenants` table with `check_in_date` and `check_out_date = NULL`.
+- **Check-out**: Sets `check_out_date` on the active tenant record AND sets all `unpaid` bills for that room to `expired`.
+- A room can have at most one **active** tenant (where `check_out_date IS NULL`).
+- When adding a new room, an optional initial tenant can be specified.
+
+### 3.8 Cascade Deletion
+
+- Deleting a room deletes all its bills, tenants (via FK `ON DELETE CASCADE`).
+- Deleting an owner account (by SuperAdmin) deletes their kost, all rooms, tenants, and bills.
+
+### 3.9 Data Isolation (Multi-Tenancy)
+
+- All room and bill queries are scoped by `kost_id` derived from the authenticated user's session.
+- Owners cannot access or modify data belonging to other owners.
 
 ---
 
-## 4. Feature Specifications
+## 4. User Roles
 
-### 4.1 Dashboard (`/`)
-
-**Purpose**: Give the owner an at-a-glance summary of the current month's billing status.
-
-**Data Scope**: Automatically filtered to the **current calendar month and year**.
-
-**Summary Cards** (4 metrics displayed prominently):
-
-| Card | Value |
+| Role | Access |
 |---|---|
-| Total Billed | Sum of `total_amount` for all bills in the current month |
-| Amount Paid | Sum of `total_amount` where `is_paid = true` |
-| Amount Unpaid | Sum of `total_amount` where `is_paid = false` |
-| Total Rooms | Count of all rooms in the system |
-
-**Alert Panels**:
-
-1. **Belum Bayar (Unpaid Bills)**: Lists rooms that have a bill this month but `is_paid = false`. Shows tenant name, room name, and amount owed.
-2. **Belum Ada Tagihan (Not Yet Billed)**: Lists occupied rooms (tenant ≠ "Kosong") that do **not** have a bill for the current month. Provides a direct link to the Billing Input page for quick action.
-
-**Monthly Bill Table**: Full table of all bills for the current month, showing room, tenant, period, meter readings, kWh used, electricity cost, total amount, and payment status badge.
-
-**Rendering**: The dashboard is a **server-rendered** page (using `force-dynamic`) so that data is always fresh on each request with no client-side fetching.
+| `owner` | Full access to their own kost data (rooms, tenants, bills). Cannot access `/admin`. |
+| `superadmin` | Access only to `/admin` panel. Can CRUD owner accounts. Has no kost data of their own. |
 
 ---
 
-### 4.2 Room Management (`/rooms`)
+## 5. Feature Specifications
 
-**Purpose**: Maintain the master registry of rooms and tenant information.
+### 5.1 Authentication
 
-**Room Card Display** (per room):
-- Room name
-- Tenant name (or "Kosong" badge if vacant)
-- Occupancy status badge: "Dihuni" (Occupied) / "Kosong" (Vacant)
-- Base price (formatted as Rupiah)
-- Monthly fee (formatted as Rupiah)
-- Price per kWh (formatted as Rupiah)
-- Edit and Delete action buttons
+- **Login** (`/login`): Email + password. Uses NextAuth.js v5 Credentials provider with bcrypt verification.
+- **Register** (`/register`): Creates a new owner account + a default kost in one step.
+- **Session**: JWT strategy. `role` and `id` are embedded in the token.
+- **Middleware**: All routes are protected. Unauthenticated requests redirect to `/login`. Superadmin redirects to `/admin` after login. Non-superadmin cannot access `/admin`.
+- **SuperAdmin Setup** (`POST /api/admin/setup`): Public one-time endpoint to create the first superadmin. Returns 409 if one already exists.
 
-**Add Room** (modal dialog):
+### 5.2 Dashboard (`/`)
 
-| Field | Type | Required | Validation |
-|---|---|---|---|
-| Room Name | Text | Yes | Non-empty string |
-| Tenant Name | Text | Yes | Non-empty string; use "Kosong" for vacant |
-| Base Price | Number | Yes | Non-negative integer (IDR) |
-| Monthly Fee | Number | Yes | Non-negative integer (IDR) |
-| Price per kWh | Number | Yes | Non-negative integer (IDR per kWh) |
+- Scoped to the authenticated owner's kost.
+- Shows current month's billing summary: total billed, paid, unpaid.
+- Alerts for unpaid bills and rooms not yet billed.
+- Shows expired bills section.
+- Displays tenant name from `tenant_snapshot_name` (not from rooms table).
+- Server-rendered (`force-dynamic`).
 
-**Edit Room** (same modal, pre-populated):
-- All fields are editable.
-- Changes are saved via `PUT /api/rooms/[id]`.
+### 5.3 Room Management (`/rooms`)
 
-**Delete Room** (confirmation dialog):
-- Warning that all associated billing data will also be deleted (cascade).
-- Deletion is irreversible.
-- Calls `DELETE /api/rooms/[id]`.
+- CRUD for rooms within the owner's kost.
+- Each room card shows:
+  - Room name, pricing details
+  - **Active tenant info** (name, phone, check-in date) if occupied
+  - Occupancy badge: "Dihuni" / "Kosong"
+  - Actions: Edit room details, Check-out tenant, Check-in new tenant, Delete room
+- **Tenant history accordion**: Expandable list of all past tenants for a room.
+- **Add Room dialog**: Optional initial tenant section (name, phone, check-in date).
+- **Checkout dialog**: Input for departure date (default today) + optional notes. Expires unpaid bills automatically.
+- **Check-in dialog**: Name, phone, check-in date (default today).
 
----
+### 5.4 Billing Input (`/billing`)
 
-### 4.3 Billing Input (`/billing`)
+- Enter electricity meter readings per room for a selected month/year.
+- Per-room entry: meter start (auto-filled), meter end, live kWh + amount preview.
+- Displays `tenant_snapshot_name` (active tenant name at billing time).
+- `paid` bills are read-only. `expired` bills cannot be re-billed.
 
-**Purpose**: Enter electricity meter readings for each room to generate/update monthly bills.
+### 5.5 Billing List (`/billing-list`)
 
-**Period Selection**:
-- Month dropdown: January–December (1–12)
-- Year dropdown: previous year, current year, next year
-- Defaults to current month and year on page load
+- Filter by month/year. Shows summary strip: total, paid, unpaid amounts.
+- Status badges: Lunas (green), Belum Lunas (red), Kedaluwarsa (grey/disabled).
+- Toggle `paid` ↔ `unpaid` (disabled for `expired`).
+- Generate WhatsApp-ready billing message per bill.
+- Delete bill (with confirmation).
 
-**Per-Room Entry Form**:
+### 5.6 SuperAdmin Panel (`/admin`)
 
-| Field | Type | Editable | Notes |
-|---|---|---|---|
-| Meter Start | Number | Conditional | Auto-filled from previous month's `meter_end`; manually editable only if no prior bill exists (amber highlight) |
-| Meter End | Number | Yes | User enters current meter reading |
-| Live kWh Preview | Computed display | Read-only | Shows `meter_end − meter_start` as user types |
-| Live Total Preview | Computed display | Read-only | Shows calculated total amount as user types |
-
-**Validation** (client-side):
-- `meter_end` must be ≥ `meter_start`
-- Both fields must be valid non-negative integers
-
-**Save Behavior**:
-- Each room has its own independent **Save** button.
-- Saving an already-existing bill for that period updates it (upsert).
-- Bills with `is_paid = true` are displayed as read-only; the Save button is hidden/disabled.
-- Success and error states are communicated via toast notifications.
-
-**Upsert Flow**:
-1. User selects period (month/year)
-2. For each room, the app fetches previous month's meter end → pre-fills meter start
-3. User enters `meter_end`
-4. User clicks Save
-5. API receives `{ month, year, entries: [{ room_id, meter_end, meter_start_override? }] }`
-6. API computes `kwh_used` and `total_amount`, then upserts into `bills` table
-7. `is_paid` is always reset to `false` on upsert
+- Separate layout from owner pages (independent of root layout).
+- Theme matches owner pages (white/slate/violet).
+- **Owner table**: Lists all owner accounts with kost name, address, room count, registration date.
+- **Add owner**: Creates account + kost in one form (name, email, password, kost name, address).
+- **Edit owner**: Update name, email, password (optional), kost name, address.
+- **Delete owner**: Permanently deletes account + all associated data (cascade).
+- Stats cards: total owners, total rooms across all kosts.
 
 ---
 
-### 4.4 Billing List (`/billing-list`)
+## 6. Bill Text Generation
 
-**Purpose**: View, filter, manage payment status, and generate bill messages for all billing records.
-
-**Filters**:
-- Month: "All Months" or specific month (1–12)
-- Year: dropdown with available years
-
-**Summary Strip** (below filters):
-- Total billed amount for the current filter selection
-- Total paid amount
-- Total unpaid amount
-
-**Bill Table Columns**:
-| Column | Description |
-|---|---|
-| Room | Room name |
-| Tenant | Tenant name |
-| Period | Month/Year (e.g., "Februari 2026") |
-| Meter Start | Starting meter reading |
-| Meter End | Ending meter reading |
-| kWh Used | `meter_end − meter_start` |
-| Electricity Cost | `kwh_used × price_per_kwh` (formatted as Rupiah) |
-| Total | `total_amount` (formatted as Rupiah) |
-| Status | "Lunas" (Paid) / "Belum Lunas" (Unpaid) — clickable badge |
-| Actions | Generate Bill Text button, Delete button |
-
-**Toggle Payment Status**:
-- Clicking the status badge immediately calls `PATCH /api/bills/[id]` with the toggled `is_paid` value.
-- UI updates optimistically.
-
-**Generate Bill Text**:
-- Opens a dialog with a pre-generated, human-readable billing message in Indonesian.
-- The text includes: greeting, tenant name, room name, billing period, itemized cost breakdown, total amount, and payment instructions with the owner's bank account details.
-- User can copy the text (e.g., to paste into WhatsApp).
-
-**Delete Bill**:
-- Confirmation dialog before deletion.
-- Calls `DELETE /api/bills/[id]`.
-- Row is removed from the table after deletion.
-
----
-
-## 5. Bill Text Generation
-
-The generated billing message follows this structure (in Bahasa Indonesia):
+Generated billing message format (Bahasa Indonesia):
 
 ```
 Tagihan Listrik - [Room Name]
 Periode: [Month Name] [Year]
-Tenant: [Tenant Name]
+Tenant: [Tenant Snapshot Name]
 
 Rincian:
 - Harga Kamar   : Rp [base_price]
@@ -245,54 +194,57 @@ Pembayaran ke:
 [Account Number]
 ```
 
-**Hardcoded Payment Details** (as of current implementation):
+**Hardcoded Payment Details** (current implementation):
 - Account Holder: `I KOMANG OKTARAMA BA`
 - Bank: `Bank Mandiri`
 - Account Number: `1450013849266`
 
 ---
 
-## 6. Navigation
+## 7. Navigation
 
-The application has 4 navigation links in the top navbar:
+### Owner Navigation (Navbar)
 
 | Label | Route | Description |
 |---|---|---|
-| Dashboard | `/` | Monthly summary and status overview |
-| Kamar | `/rooms` | Room management |
+| Dashboard | `/` | Monthly summary and billing status |
+| Kelola Kamar | `/rooms` | Room + tenant management |
 | Input Tagihan | `/billing` | Monthly meter reading input |
 | Daftar Tagihan | `/billing-list` | Billing history and management |
 
-The navbar highlights the currently active route.
+The navbar shows the logged-in user's name, avatar initials, and a logout dropdown.
+
+### SuperAdmin Navigation
+
+A separate header at `/admin` (no Navbar). Shows "KostManager Admin" badge, user name, and logout.
 
 ---
 
-## 7. Localization & Formatting
+## 8. Localization & Formatting
 
-- **Language**: Bahasa Indonesia (UI labels, alerts, messages)
-- **Currency**: IDR (Indonesian Rupiah) — formatted with dot-separated thousands (e.g., `Rp 1.500.000`)
-- **Month Names**: Indonesian month names (e.g., "Januari", "Februari", ..., "Desember")
-- **Date/Time**: No explicit timezone handling; relies on server/database defaults
-- **HTML `lang` attribute**: Set to `"id"` (Indonesian) in the root layout
-
----
-
-## 8. Error Handling
-
-- API errors return HTTP 4xx/5xx with a JSON `{ error: string }` body.
-- UI communicates errors via **toast notifications** (Sonner library).
-- Form validation errors are shown inline via React Hook Form + Zod.
-- 404 errors are returned by API routes when a room or bill ID is not found.
+- **Language**: Bahasa Indonesia (all UI labels, messages, alerts)
+- **Currency**: IDR — formatted with dot-separated thousands (e.g., `Rp 1.500.000`)
+- **Month Names**: Indonesian (Januari … Desember)
+- **HTML `lang`**: `"id"` in root layout
 
 ---
 
-## 9. Known Constraints & Limitations
+## 9. Error Handling
 
-1. **No Authentication**: The application has no login/authentication system. Anyone who can access the URL has full read/write access.
-2. **No Multi-Tenancy**: Designed for a single property owner; no concept of multiple users or properties.
-3. **No Automated Tests**: There are no unit, integration, or end-to-end tests.
-4. **No Audit Trail**: No history of changes; edits and deletions are permanent.
-5. **Hardcoded Bank Details**: The owner's payment information is embedded in source code (`lib/helpers.ts`).
-6. **Single-Currency**: Only IDR; no multi-currency support.
-7. **No Notifications/Reminders**: The system generates bill text but does not send messages automatically.
-8. **Year Range Limitation**: The billing input year dropdown only shows 3 years (previous, current, next).
+- API errors return `{ error: string }` with appropriate HTTP status.
+- UI communicates errors via **Sonner** toast notifications.
+- Client-side form validation (inline).
+- `expired` bills return 403 if toggled via API.
+
+---
+
+## 10. Known Constraints & Limitations
+
+1. **Single kost per owner**: Each owner account manages exactly one kost.
+2. **No automated tests**: No unit, integration, or E2E tests.
+3. **No audit trail**: Edits and deletions are permanent.
+4. **Hardcoded bank details**: Payment info is embedded in `lib/helpers.ts`.
+5. **Single currency**: IDR only.
+6. **No automatic notifications**: System generates bill text but does not send messages.
+7. **Year range**: Billing input year dropdown shows only ±1 year from current.
+8. **Node.js ≥ 20.9** required (Next.js 16 requirement).
