@@ -1,0 +1,11 @@
+import Navbar from "@/components/Navbar";
+
+// Layout untuk semua halaman pengelola kost
+export default function OwnerLayout({ children }: { children: React.ReactNode }) {
+    return (
+        <>
+            <Navbar />
+            <main className="max-w-6xl mx-auto px-4 py-8">{children}</main>
+        </>
+    );
+}

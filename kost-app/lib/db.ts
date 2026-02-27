@@ -5,16 +5,16 @@ import { Room, Bill, Tenant, Kost, User, DatabaseData, BillStatus } from "./type
 
 export async function getUserByEmail(email: string): Promise<User | null> {
   const { rows } = await sql<User>`
-    SELECT id, name, email, password_hash FROM users WHERE email = ${email}
+    SELECT id, name, email, password_hash, role FROM users WHERE email = ${email}
   `;
   return rows[0] ?? null;
 }
 
 export async function createUser(user: Omit<User, "created_at">): Promise<User> {
   const { rows } = await sql<User>`
-    INSERT INTO users (id, name, email, password_hash)
-    VALUES (${user.id}, ${user.name}, ${user.email}, ${user.password_hash})
-    RETURNING id, name, email, password_hash
+    INSERT INTO users (id, name, email, password_hash, role)
+    VALUES (${user.id}, ${user.name}, ${user.email}, ${user.password_hash}, ${user.role ?? 'owner'})
+    RETURNING id, name, email, password_hash, role
   `;
   return rows[0];
 }
@@ -288,3 +288,83 @@ export async function readData(kostId: string): Promise<DatabaseData> {
     bills: billRows.map(({ room: _room, ...bill }) => bill),
   };
 }
+
+// ─── Admin ───────────────────────────────────────────────────────────────────
+
+export interface OwnerWithKost extends User {
+  kost_id: string | null;
+  kost_name: string | null;
+  kost_address: string | null;
+  room_count: number;
+}
+
+export async function getAllOwners(): Promise<OwnerWithKost[]> {
+  const { rows } = await sql<OwnerWithKost>`
+    SELECT
+      u.id, u.name, u.email, u.password_hash, u.role, u.created_at,
+      k.id        AS kost_id,
+      k.name      AS kost_name,
+      k.address   AS kost_address,
+      COALESCE((SELECT COUNT(*) FROM rooms r WHERE r.kost_id = k.id), 0)::int AS room_count
+    FROM users u
+    LEFT JOIN kosts k ON k.user_id = u.id
+    WHERE u.role = 'owner'
+    ORDER BY u.created_at DESC
+  `;
+  return rows;
+}
+
+export async function hasSuperAdmin(): Promise<boolean> {
+  const { rows } = await sql<{ count: string }>`
+    SELECT COUNT(*)::text AS count FROM users WHERE role = 'superadmin'
+  `;
+  return parseInt(rows[0]?.count ?? "0") > 0;
+}
+
+export async function createOwnerUser(
+  userId: string,
+  name: string,
+  email: string,
+  passwordHash: string,
+  kostName: string,
+  kostAddress?: string | null
+): Promise<{ user: User; kost: Kost }> {
+  const user = await createUser({ id: userId, name, email, password_hash: passwordHash, role: "owner" });
+  const kostId = `kost-${Date.now()}`;
+  const kost = await createKost({ id: kostId, user_id: userId, name: kostName, address: kostAddress ?? undefined });
+  return { user, kost };
+}
+
+export async function updateOwnerUser(
+  userId: string,
+  data: { name?: string; email?: string; passwordHash?: string; kostName?: string; kostAddress?: string | null }
+): Promise<void> {
+  if (data.name || data.email || data.passwordHash) {
+    await sql`
+      UPDATE users SET
+        name          = COALESCE(${data.name ?? null}, name),
+        email         = COALESCE(${data.email ?? null}, email),
+        password_hash = COALESCE(${data.passwordHash ?? null}, password_hash)
+      WHERE id = ${userId} AND role = 'owner'
+    `;
+  }
+  if (data.kostName !== undefined || data.kostAddress !== undefined) {
+    await sql`
+      UPDATE kosts SET
+        name    = COALESCE(${data.kostName ?? null}, name),
+        address = COALESCE(${data.kostAddress ?? null}, address)
+      WHERE user_id = ${userId}
+    `;
+  }
+}
+
+export async function deleteOwnerUser(userId: string): Promise<boolean> {
+  // Cascade: kosts → rooms → tenants/bills (FK ON DELETE CASCADE)
+  const { rowCount } = await sql`
+    DELETE FROM users WHERE id = ${userId} AND role = 'owner'
+  `;
+  return (rowCount ?? 0) > 0;
+}
+
+
+
