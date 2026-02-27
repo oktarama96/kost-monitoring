@@ -79,16 +79,17 @@ export default function BillingInputPage() {
               : "",
           existingBill: existingBill
             ? {
-                id: existingBill.id,
-                room_id: existingBill.room_id,
-                month: existingBill.month,
-                year: existingBill.year,
-                meter_start: existingBill.meter_start,
-                meter_end: existingBill.meter_end,
-                kwh_used: existingBill.kwh_used,
-                total_amount: existingBill.total_amount,
-                is_paid: existingBill.is_paid,
-              }
+              id: existingBill.id,
+              room_id: existingBill.room_id,
+              month: existingBill.month,
+              year: existingBill.year,
+              meter_start: existingBill.meter_start,
+              meter_end: existingBill.meter_end,
+              kwh_used: existingBill.kwh_used,
+              total_amount: existingBill.total_amount,
+              status: existingBill.status,
+              tenant_snapshot_name: existingBill.tenant_snapshot_name,
+            }
             : undefined,
         };
       });
@@ -261,7 +262,7 @@ export default function BillingInputPage() {
       ) : (
         <div className="space-y-3">
           {entries.map((entry) => {
-            const isPaid = entry.existingBill?.is_paid;
+            const isPaid = entry.existingBill?.status === "paid";
             const isExisting = !!entry.existingBill;
             const isSubmitting = submittingIds[entry.room.id] ?? false;
 
@@ -275,8 +276,8 @@ export default function BillingInputPage() {
 
             const kwhPreview =
               entry.meter_end !== "" &&
-              meterStartNum !== null &&
-              meterEndNum >= meterStartNum
+                meterStartNum !== null &&
+                meterEndNum >= meterStartNum
                 ? meterEndNum - meterStartNum
                 : null;
 
@@ -294,13 +295,12 @@ export default function BillingInputPage() {
             return (
               <Card
                 key={entry.room.id}
-                className={`transition-colors ${
-                  isPaid
+                className={`transition-colors ${isPaid
                     ? "border-green-200 bg-green-50"
                     : isExisting
                       ? "border-blue-200 bg-blue-50"
                       : "border-slate-200"
-                }`}
+                  }`}
               >
                 <CardContent className="pt-4 pb-4">
                   <div className="flex flex-col sm:flex-row sm:items-center gap-4">
@@ -322,7 +322,7 @@ export default function BillingInputPage() {
                           </Badge>
                         )}
                       </div>
-                      <p className="text-sm text-slate-500">{entry.room.tenant_name}</p>
+                      <p className="text-sm text-slate-500">{entry.existingBill?.tenant_snapshot_name ?? "Belum ada penghuni"}</p>
                       <p className="text-xs text-slate-400 mt-0.5">
                         {formatRupiah(entry.room.base_price)} + iuran{" "}
                         {formatRupiah(entry.room.monthly_fee)} +{" "}

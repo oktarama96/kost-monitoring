@@ -96,12 +96,13 @@ export default function BillingListPage() {
   }, [fetchBills]);
 
   async function togglePaidStatus(bill: BillWithRoom) {
+    if (bill.status === "expired") return;
     setTogglingId(bill.id);
     try {
       const res = await fetch(`/api/bills/${bill.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ is_paid: !bill.is_paid }),
+        body: JSON.stringify({ is_paid: bill.status !== "paid" }),
       });
 
       if (!res.ok) {
@@ -112,10 +113,10 @@ export default function BillingListPage() {
       const updated = await res.json();
       setBills((prev) =>
         prev.map((b) =>
-          b.id === bill.id ? { ...b, is_paid: updated.is_paid } : b
+          b.id === bill.id ? { ...b, status: updated.status } : b
         )
       );
-      toast.success(updated.is_paid ? "Tagihan ditandai Lunas!" : "Status diubah ke Belum Lunas");
+      toast.success(updated.status === "paid" ? "Tagihan ditandai Lunas!" : "Status diubah ke Belum Lunas");
     } catch (err) {
       toast.error(String(err));
     } finally {
@@ -130,7 +131,7 @@ export default function BillingListPage() {
     }
 
     const text = generateBillText({
-      tenant_name: bill.room.tenant_name,
+      tenant_name: bill.tenant_snapshot_name ?? bill.room.room_name,
       room_name: bill.room.room_name,
       month: bill.month,
       year: bill.year,
@@ -182,10 +183,10 @@ export default function BillingListPage() {
   // Statistik summary
   const totalAmount = bills.reduce((sum, b) => sum + b.total_amount, 0);
   const paidAmount = bills
-    .filter((b) => b.is_paid)
+    .filter((b) => b.status === "paid")
     .reduce((sum, b) => sum + b.total_amount, 0);
   const unpaidAmount = bills
-    .filter((b) => !b.is_paid)
+    .filter((b) => b.status === "unpaid")
     .reduce((sum, b) => sum + b.total_amount, 0);
 
   return (
@@ -268,7 +269,7 @@ export default function BillingListPage() {
               {formatRupiah(paidAmount)}
             </p>
             <p className="text-xs text-green-500">
-              {bills.filter((b) => b.is_paid).length} tagihan
+              {bills.filter((b) => b.status === "paid").length} tagihan
             </p>
           </div>
           <div className="bg-red-50 rounded-lg border border-red-200 p-4 text-center">
@@ -277,7 +278,7 @@ export default function BillingListPage() {
               {formatRupiah(unpaidAmount)}
             </p>
             <p className="text-xs text-red-500">
-              {bills.filter((b) => !b.is_paid).length} tagihan
+              {bills.filter((b) => b.status === "unpaid").length} tagihan
             </p>
           </div>
         </div>
@@ -331,7 +332,7 @@ export default function BillingListPage() {
                           {bill.room?.room_name ?? bill.room_id}
                         </TableCell>
                         <TableCell className="text-slate-500">
-                          {bill.room?.tenant_name ?? "—"}
+                          {bill.tenant_snapshot_name ?? "—"}
                         </TableCell>
                         <TableCell className="text-center text-sm text-slate-500">
                           {MONTH_NAMES[bill.month]}/{bill.year}
@@ -355,25 +356,31 @@ export default function BillingListPage() {
                           {formatRupiah(bill.total_amount)}
                         </TableCell>
                         <TableCell className="text-center">
-                          <button
-                            onClick={() => togglePaidStatus(bill)}
-                            disabled={togglingId === bill.id}
-                            className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-colors hover:opacity-80 disabled:opacity-50"
-                            style={{
-                              background: bill.is_paid ? "#dcfce7" : "#fee2e2",
-                              color: bill.is_paid ? "#15803d" : "#dc2626",
-                              border: `1px solid ${bill.is_paid ? "#86efac" : "#fca5a5"}`,
-                            }}
-                          >
-                            {togglingId === bill.id ? (
-                              <RefreshCw size={11} className="animate-spin" />
-                            ) : bill.is_paid ? (
-                              <CheckCircle2 size={11} />
-                            ) : (
-                              <XCircle size={11} />
-                            )}
-                            {bill.is_paid ? "Lunas" : "Belum"}
-                          </button>
+                          {bill.status === "expired" ? (
+                            <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium bg-slate-100 text-slate-400 border border-slate-200 cursor-default">
+                              Kedaluwarsa
+                            </span>
+                          ) : (
+                            <button
+                              onClick={() => togglePaidStatus(bill)}
+                              disabled={togglingId === bill.id}
+                              className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-colors hover:opacity-80 disabled:opacity-50"
+                              style={{
+                                background: bill.status === "paid" ? "#dcfce7" : "#fee2e2",
+                                color: bill.status === "paid" ? "#15803d" : "#dc2626",
+                                border: `1px solid ${bill.status === "paid" ? "#86efac" : "#fca5a5"}`,
+                              }}
+                            >
+                              {togglingId === bill.id ? (
+                                <RefreshCw size={11} className="animate-spin" />
+                              ) : bill.status === "paid" ? (
+                                <CheckCircle2 size={11} />
+                              ) : (
+                                <XCircle size={11} />
+                              )}
+                              {bill.status === "paid" ? "Lunas" : "Belum"}
+                            </button>
+                          )}
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center justify-center gap-1">
