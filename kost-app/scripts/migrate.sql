@@ -53,3 +53,8 @@ WHERE status = 'unpaid';  -- hanya baris yang belum tersentuh
 
 ALTER TABLE bills
   DROP COLUMN IF EXISTS is_paid;
+
+-- ─── 6. Tambah kolom role ke users ──────────────────────────────────────────
+ALTER TABLE users
+  ADD COLUMN IF NOT EXISTS role VARCHAR(32) NOT NULL DEFAULT 'owner';
+

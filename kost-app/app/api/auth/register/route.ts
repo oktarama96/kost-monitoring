@@ -32,6 +32,7 @@ export async function POST(req: NextRequest) {
             name,
             email,
             password_hash: passwordHash,
+            role: "owner",
         });
 
         // Buat kost default

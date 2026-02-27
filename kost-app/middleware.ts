@@ -7,7 +7,7 @@ export async function middleware(request: NextRequest) {
     const { pathname } = request.nextUrl;
 
     // Rute publik yang tidak perlu login
-    const publicPaths = ["/login", "/register", "/api/auth"];
+    const publicPaths = ["/login", "/register", "/api/auth", "/api/admin/setup"];
     const isPublic = publicPaths.some((p) => pathname.startsWith(p));
 
     if (!session && !isPublic) {
@@ -15,9 +15,28 @@ export async function middleware(request: NextRequest) {
         return NextResponse.redirect(loginUrl);
     }
 
-    // Jika sudah login dan akses /login atau /register, redirect ke dashboard
-    if (session && (pathname === "/login" || pathname === "/register")) {
-        return NextResponse.redirect(new URL("/", request.url));
+    if (session) {
+        const role = session.user.role;
+
+        // Proteksi /admin/* — hanya superadmin
+        // Kecualikan /api/admin/setup karena dipakai saat belum ada superadmin
+        const isAdminSetup = pathname === "/api/admin/setup";
+        if (!isAdminSetup && (pathname.startsWith("/admin") || pathname.startsWith("/api/admin"))) {
+            if (role !== "superadmin") {
+                return NextResponse.redirect(new URL("/", request.url));
+            }
+        }
+
+        // Setelah login: superadmin → /admin, owner → /
+        if (pathname === "/login" || pathname === "/register") {
+            if (role === "superadmin") {
+                return NextResponse.redirect(new URL("/admin", request.url));
+            }
+            return NextResponse.redirect(new URL("/", request.url));
+        }
+
+        // Owner tidak boleh akses /admin (sudah dicek di atas)
+        // Superadmin yang akses "/" bisa bebas (tidak di-redirect)
     }
 
     return NextResponse.next();
@@ -25,7 +44,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
     matcher: [
-        // Jalankan middleware di semua halaman kecuali _next dan static files
         "/((?!_next/static|_next/image|favicon.ico).*)",
     ],
 };
