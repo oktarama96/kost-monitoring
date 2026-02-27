@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { readData } from "@/lib/db";
 
+export const runtime = "nodejs";
+
 // GET /api/rooms/[id]/last-meter?month=2&year=2026
 // Mengembalikan angka meteran akhir dari bulan sebelumnya untuk dijadikan meter_start
 export async function GET(

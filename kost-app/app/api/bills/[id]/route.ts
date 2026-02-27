@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { readData, writeData } from "@/lib/db";
 
+export const runtime = "nodejs";
+
 // PATCH /api/bills/[id] — toggle status pembayaran is_paid
 export async function PATCH(
   req: NextRequest,

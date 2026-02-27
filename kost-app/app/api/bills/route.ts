@@ -3,6 +3,8 @@ import { readData, writeData } from "@/lib/db";
 import { Bill } from "@/lib/types";
 import { calculateBillAmount, generateBillId } from "@/lib/helpers";
 
+export const runtime = "nodejs";
+
 // GET /api/bills?month=2&year=2026 — ambil semua tagihan, opsional filter bulan/tahun
 export async function GET(req: NextRequest) {
   try {

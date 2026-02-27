@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { readData, writeData } from "@/lib/db";
 import { Room } from "@/lib/types";
 
+export const runtime = "nodejs";
+
 // GET /api/rooms — ambil semua data kamar
 export async function GET() {
   try {
@@ -44,9 +46,10 @@ export async function POST(req: NextRequest) {
     writeData(data);
 
     return NextResponse.json(newRoom, { status: 201 });
-  } catch {
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
     return NextResponse.json(
-      { error: "Gagal menambah kamar" },
+      { error: `Gagal menambah kamar: ${message}` },
       { status: 500 }
     );
   }

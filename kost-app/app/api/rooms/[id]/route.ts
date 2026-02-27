@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { readData, writeData } from "@/lib/db";
 
+export const runtime = "nodejs";
+
 // PUT /api/rooms/[id] — update data kamar
 export async function PUT(
   req: NextRequest,
