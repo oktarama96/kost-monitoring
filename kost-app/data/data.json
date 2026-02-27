@@ -1,0 +1,57 @@
+{
+  "rooms": [
+    {
+      "id": "room-01",
+      "room_name": "Kamar A1",
+      "tenant_name": "Bli Wayan",
+      "base_price": 1500000,
+      "monthly_fee": 50000,
+      "price_per_kwh": 2000
+    },
+    {
+      "id": "room-02",
+      "room_name": "Kamar A2",
+      "tenant_name": "Mbak Ayu",
+      "base_price": 1200000,
+      "monthly_fee": 50000,
+      "price_per_kwh": 2500
+    },
+    {
+      "id": "room-03",
+      "room_name": "Kamar B1",
+      "tenant_name": "Kosong",
+      "base_price": 1500000,
+      "monthly_fee": 50000,
+      "price_per_kwh": 2000
+    }
+  ],
+  "bills": [
+    {
+      "id": "bill-022026-room01",
+      "room_id": "room-01",
+      "month": 2,
+      "year": 2026,
+      "kwh_used": 45,
+      "total_amount": 1640000,
+      "is_paid": false
+    },
+    {
+      "id": "bill-022026-room02",
+      "room_id": "room-02",
+      "month": 2,
+      "year": 2026,
+      "kwh_used": 30,
+      "total_amount": 1325000,
+      "is_paid": true
+    },
+    {
+      "id": "bill-022026-room03",
+      "room_id": "room-03",
+      "month": 2,
+      "year": 2026,
+      "kwh_used": 55,
+      "total_amount": 1660000,
+      "is_paid": false
+    }
+  ]
+}
