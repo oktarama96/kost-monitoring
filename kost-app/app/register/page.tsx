@@ -5,11 +5,10 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { signIn } from "next-auth/react";
 import { toast } from "sonner";
-import { Building2, Loader2 } from "lucide-react";
+import { Building2, Loader2, User, Mail, Lock, MapPin, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function RegisterPage() {
     const router = useRouter();
@@ -41,7 +40,6 @@ export default function RegisterPage() {
                 return;
             }
 
-            // Auto login setelah register berhasil
             const loginRes = await signIn("credentials", {
                 email: form.email,
                 password: form.password,
@@ -64,104 +62,198 @@ export default function RegisterPage() {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4 py-8">
-            <div className="w-full max-w-md">
-                {/* Logo */}
-                <div className="flex flex-col items-center mb-8">
-                    <div className="bg-slate-900 rounded-xl p-3 mb-3">
-                        <Building2 className="h-8 w-8 text-white" />
+        <div className="min-h-screen flex">
+            {/* Left panel — branding */}
+            <div className="hidden lg:flex flex-col justify-between w-[420px] shrink-0 bg-sidebar px-10 py-12">
+                <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center shadow-md">
+                        <Building2 className="h-5 w-5 text-primary-foreground" />
                     </div>
-                    <h1 className="text-2xl font-bold text-slate-900">KostManager</h1>
-                    <p className="text-slate-500 text-sm mt-1">Daftar akun pengelola kost</p>
+                    <span className="text-lg font-bold text-sidebar-foreground tracking-tight">
+                        KostManager
+                    </span>
                 </div>
 
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Buat Akun</CardTitle>
-                        <CardDescription>
+                <div className="space-y-4">
+                    <h2 className="text-3xl font-bold text-sidebar-foreground leading-snug">
+                        Mulai kelola kost<br />Anda hari ini
+                    </h2>
+                    <p className="text-sidebar-foreground/60 text-sm leading-relaxed">
+                        Daftarkan akun dan kost Anda dalam hitungan menit. Gratis selamanya
+                        untuk pengelola kost skala kecil hingga menengah.
+                    </p>
+                    <ul className="space-y-2 text-sm text-sidebar-foreground/60">
+                        {[
+                            "Catat meteran listrik per kamar",
+                            "Pantau status pembayaran real-time",
+                            "Generate teks tagihan otomatis",
+                        ].map((item) => (
+                            <li key={item} className="flex items-center gap-2">
+                                <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
+                                {item}
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+
+                <div className="flex items-center gap-2 text-xs text-sidebar-foreground/40">
+                    <span>© 2025 KostManager</span>
+                    <span>·</span>
+                    <span>v1.0</span>
+                </div>
+            </div>
+
+            {/* Right panel — form */}
+            <div className="flex-1 flex items-center justify-center bg-background px-6 py-12">
+                <div className="w-full max-w-sm space-y-8">
+                    {/* Mobile logo */}
+                    <div className="flex items-center gap-3 lg:hidden">
+                        <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center">
+                            <Building2 className="h-5 w-5 text-primary-foreground" />
+                        </div>
+                        <span className="text-lg font-bold text-foreground">KostManager</span>
+                    </div>
+
+                    <div className="space-y-1.5">
+                        <h1 className="text-2xl font-bold text-foreground">Buat akun baru</h1>
+                        <p className="text-sm text-muted-foreground">
                             Isi data Anda dan nama kost yang akan dikelola
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <form onSubmit={handleSubmit} className="space-y-4">
-                            <div className="space-y-1">
-                                <Label htmlFor="name">Nama Lengkap</Label>
-                                <Input
-                                    id="name"
-                                    placeholder="Budi Santoso"
-                                    value={form.name}
-                                    onChange={(e) => setForm({ ...form, name: e.target.value })}
-                                    required
-                                />
-                            </div>
-                            <div className="space-y-1">
-                                <Label htmlFor="reg-email">Email</Label>
-                                <Input
-                                    id="reg-email"
-                                    type="email"
-                                    placeholder="nama@email.com"
-                                    value={form.email}
-                                    onChange={(e) => setForm({ ...form, email: e.target.value })}
-                                    required
-                                />
-                            </div>
-                            <div className="space-y-1">
-                                <Label htmlFor="reg-password">Password</Label>
-                                <Input
-                                    id="reg-password"
-                                    type="password"
-                                    placeholder="Minimal 6 karakter"
-                                    minLength={6}
-                                    value={form.password}
-                                    onChange={(e) => setForm({ ...form, password: e.target.value })}
-                                    required
-                                />
+                        </p>
+                    </div>
+
+                    <form onSubmit={handleSubmit} className="space-y-5">
+                        {/* Account section */}
+                        <div className="space-y-4">
+                            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">
+                                Informasi Akun
+                            </p>
+
+                            <div className="space-y-2">
+                                <Label htmlFor="name" className="text-sm font-medium">
+                                    Nama Lengkap
+                                </Label>
+                                <div className="relative">
+                                    <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                    <Input
+                                        id="name"
+                                        placeholder="Budi Santoso"
+                                        value={form.name}
+                                        onChange={(e) => setForm({ ...form, name: e.target.value })}
+                                        className="pl-9"
+                                        required
+                                    />
+                                </div>
                             </div>
 
-                            <div className="border-t pt-4 space-y-3">
-                                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
-                                    Informasi Kost
-                                </p>
-                                <div className="space-y-1">
-                                    <Label htmlFor="kost_name">Nama Kost</Label>
+                            <div className="space-y-2">
+                                <Label htmlFor="reg-email" className="text-sm font-medium">
+                                    Email
+                                </Label>
+                                <div className="relative">
+                                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                    <Input
+                                        id="reg-email"
+                                        type="email"
+                                        placeholder="nama@email.com"
+                                        value={form.email}
+                                        onChange={(e) => setForm({ ...form, email: e.target.value })}
+                                        className="pl-9"
+                                        required
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label htmlFor="reg-password" className="text-sm font-medium">
+                                    Password
+                                </Label>
+                                <div className="relative">
+                                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                    <Input
+                                        id="reg-password"
+                                        type="password"
+                                        placeholder="Minimal 6 karakter"
+                                        minLength={6}
+                                        value={form.password}
+                                        onChange={(e) => setForm({ ...form, password: e.target.value })}
+                                        className="pl-9"
+                                        required
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Kost section */}
+                        <div className="space-y-4 pt-1">
+                            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">
+                                Informasi Kost
+                            </p>
+
+                            <div className="space-y-2">
+                                <Label htmlFor="kost_name" className="text-sm font-medium">
+                                    Nama Kost
+                                </Label>
+                                <div className="relative">
+                                    <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                                     <Input
                                         id="kost_name"
                                         placeholder="Kost Bu Siti"
                                         value={form.kost_name}
                                         onChange={(e) => setForm({ ...form, kost_name: e.target.value })}
+                                        className="pl-9"
                                         required
                                     />
                                 </div>
-                                <div className="space-y-1">
-                                    <Label htmlFor="kost_address">
-                                        Alamat <span className="text-slate-400 font-normal">(opsional)</span>
-                                    </Label>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label htmlFor="kost_address" className="text-sm font-medium">
+                                    Alamat{" "}
+                                    <span className="text-muted-foreground font-normal">(opsional)</span>
+                                </Label>
+                                <div className="relative">
+                                    <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                                     <Input
                                         id="kost_address"
                                         placeholder="Jl. Merdeka No. 10, ..."
                                         value={form.kost_address}
                                         onChange={(e) => setForm({ ...form, kost_address: e.target.value })}
+                                        className="pl-9"
                                     />
                                 </div>
                             </div>
+                        </div>
 
-                            <Button type="submit" className="w-full" disabled={loading}>
-                                {loading ? (
-                                    <><Loader2 className="h-4 w-4 animate-spin mr-2" />Mendaftar...</>
-                                ) : (
-                                    "Buat Akun"
-                                )}
-                            </Button>
-                        </form>
+                        <Button
+                            type="submit"
+                            className="w-full gap-2 font-semibold"
+                            disabled={loading}
+                            size="lg"
+                        >
+                            {loading ? (
+                                <>
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                    Mendaftar...
+                                </>
+                            ) : (
+                                <>
+                                    Buat Akun
+                                    <ArrowRight className="h-4 w-4" />
+                                </>
+                            )}
+                        </Button>
+                    </form>
 
-                        <p className="text-center text-sm text-slate-500 mt-4">
-                            Sudah punya akun?{" "}
-                            <Link href="/login" className="text-slate-900 font-semibold hover:underline">
-                                Masuk di sini
-                            </Link>
-                        </p>
-                    </CardContent>
-                </Card>
+                    <p className="text-center text-sm text-muted-foreground">
+                        Sudah punya akun?{" "}
+                        <Link
+                            href="/login"
+                            className="font-semibold text-primary hover:underline underline-offset-4"
+                        >
+                            Masuk di sini
+                        </Link>
+                    </p>
+                </div>
             </div>
         </div>
     );

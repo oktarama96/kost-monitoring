@@ -31,7 +31,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
 import {
   Table,
   TableBody,
@@ -47,7 +46,7 @@ import {
   Copy,
   Trash2,
   RefreshCw,
-  Filter,
+  TrendingUp,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -72,10 +71,6 @@ export default function BillingListPage() {
   const fetchBills = useCallback(async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams();
-      if (selectedMonth !== "all") params.set("month", selectedMonth);
-      params.set("year", selectedYear);
-
       const url =
         selectedMonth !== "all"
           ? `/api/bills?month=${selectedMonth}&year=${selectedYear}`
@@ -116,7 +111,11 @@ export default function BillingListPage() {
           b.id === bill.id ? { ...b, status: updated.status } : b
         )
       );
-      toast.success(updated.status === "paid" ? "Tagihan ditandai Lunas!" : "Status diubah ke Belum Lunas");
+      toast.success(
+        updated.status === "paid"
+          ? "Tagihan ditandai Lunas!"
+          : "Status diubah ke Belum Lunas"
+      );
     } catch (err) {
       toast.error(String(err));
     } finally {
@@ -180,7 +179,6 @@ export default function BillingListPage() {
     }
   }
 
-  // Statistik summary
   const totalAmount = bills.reduce((sum, b) => sum + b.total_amount, 0);
   const paidAmount = bills
     .filter((b) => b.status === "paid")
@@ -188,31 +186,41 @@ export default function BillingListPage() {
   const unpaidAmount = bills
     .filter((b) => b.status === "unpaid")
     .reduce((sum, b) => sum + b.total_amount, 0);
+  const paidCount = bills.filter((b) => b.status === "paid").length;
+  const unpaidCount = bills.filter((b) => b.status === "unpaid").length;
+  const collectionRate =
+    totalAmount > 0 ? Math.round((paidAmount / totalAmount) * 100) : 0;
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-slate-900">Daftar Tagihan</h1>
-        <p className="text-slate-500 mt-1">
-          Kelola status pembayaran dan generate teks tagihan
-        </p>
+      {/* Page header */}
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Daftar Tagihan</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Kelola status pembayaran dan generate teks tagihan
+          </p>
+        </div>
+        {bills.length > 0 && (
+          <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted px-3 py-1.5 rounded-full w-fit">
+            <TrendingUp size={12} className="text-primary" />
+            Pelunasan:{" "}
+            <span className="font-bold text-foreground">{collectionRate}%</span>
+          </div>
+        )}
       </div>
 
       {/* Filter */}
-      <Card>
-        <CardHeader className="pb-4">
-          <CardTitle className="text-base flex items-center gap-2">
-            <Filter size={16} />
-            Filter Periode
-          </CardTitle>
+      <Card className="border-border/60 shadow-sm">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm font-semibold">Filter Periode</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-wrap items-end gap-4">
-            <div className="space-y-2 min-w-40">
-              <Label>Bulan</Label>
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="space-y-1.5 min-w-40">
+              <Label className="text-xs font-medium">Bulan</Label>
               <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-                <SelectTrigger>
+                <SelectTrigger className="h-9">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -225,10 +233,10 @@ export default function BillingListPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2 min-w-28">
-              <Label>Tahun</Label>
+            <div className="space-y-1.5 min-w-28">
+              <Label className="text-xs font-medium">Tahun</Label>
               <Select value={selectedYear} onValueChange={setSelectedYear}>
-                <SelectTrigger>
+                <SelectTrigger className="h-9">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -242,82 +250,115 @@ export default function BillingListPage() {
             </div>
             <Button
               variant="outline"
+              size="sm"
               onClick={fetchBills}
               disabled={loading}
-              className="flex items-center gap-2"
+              className="gap-2 h-9"
             >
-              <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
+              <RefreshCw size={13} className={loading ? "animate-spin" : ""} />
               Muat Ulang
             </Button>
           </div>
         </CardContent>
       </Card>
 
-      {/* Summary Strip */}
+      {/* Summary strip */}
       {bills.length > 0 && (
-        <div className="grid grid-cols-3 gap-4">
-          <div className="bg-white rounded-lg border p-4 text-center">
-            <p className="text-xs text-slate-500 mb-1">Total</p>
-            <p className="text-lg font-bold text-slate-900">
-              {formatRupiah(totalAmount)}
-            </p>
-            <p className="text-xs text-slate-400">{bills.length} tagihan</p>
-          </div>
-          <div className="bg-green-50 rounded-lg border border-green-200 p-4 text-center">
-            <p className="text-xs text-green-600 mb-1">Lunas</p>
-            <p className="text-lg font-bold text-green-700">
-              {formatRupiah(paidAmount)}
-            </p>
-            <p className="text-xs text-green-500">
-              {bills.filter((b) => b.status === "paid").length} tagihan
-            </p>
-          </div>
-          <div className="bg-red-50 rounded-lg border border-red-200 p-4 text-center">
-            <p className="text-xs text-red-600 mb-1">Belum Lunas</p>
-            <p className="text-lg font-bold text-red-700">
-              {formatRupiah(unpaidAmount)}
-            </p>
-            <p className="text-xs text-red-500">
-              {bills.filter((b) => b.status === "unpaid").length} tagihan
-            </p>
-          </div>
+        <div className="grid grid-cols-3 gap-3">
+          <Card className="border-border/60 shadow-sm">
+            <CardContent className="pt-4 pb-4 text-center">
+              <p className="text-xs text-muted-foreground mb-1">Total</p>
+              <p className="text-lg font-bold text-foreground">
+                {formatRupiah(totalAmount)}
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {bills.length} tagihan
+              </p>
+            </CardContent>
+          </Card>
+          <Card className="border-emerald-200/60 bg-emerald-50/30 shadow-sm">
+            <CardContent className="pt-4 pb-4 text-center">
+              <p className="text-xs text-emerald-600 mb-1">Lunas</p>
+              <p className="text-lg font-bold text-emerald-700">
+                {formatRupiah(paidAmount)}
+              </p>
+              <p className="text-xs text-emerald-600/70 mt-0.5">
+                {paidCount} tagihan
+              </p>
+            </CardContent>
+          </Card>
+          <Card className="border-red-200/60 bg-red-50/30 shadow-sm">
+            <CardContent className="pt-4 pb-4 text-center">
+              <p className="text-xs text-red-600 mb-1">Belum Lunas</p>
+              <p className="text-lg font-bold text-red-700">
+                {formatRupiah(unpaidAmount)}
+              </p>
+              <p className="text-xs text-red-600/70 mt-0.5">
+                {unpaidCount} tagihan
+              </p>
+            </CardContent>
+          </Card>
         </div>
       )}
 
-      {/* Bills Table */}
-      <Card>
-        <CardContent className="pt-6">
+      {/* Bills table */}
+      <Card className="border-border/60 shadow-sm">
+        <CardContent className="pt-5">
           {loading ? (
             <div className="space-y-3">
               {[1, 2, 3, 4].map((i) => (
                 <div
                   key={i}
-                  className="h-14 bg-slate-100 rounded animate-pulse"
+                  className="h-12 bg-muted rounded-lg animate-pulse"
                 />
               ))}
             </div>
           ) : bills.length === 0 ? (
-            <div className="text-center py-16 text-slate-400">
-              <MessageSquare className="mx-auto mb-3 text-slate-300" size={48} />
-              <p className="font-medium">Tidak ada tagihan ditemukan</p>
-              <p className="text-sm mt-1">
-                Coba ubah filter bulan/tahun atau tambah tagihan baru
-              </p>
+            <div className="flex flex-col items-center justify-center py-16 gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-muted flex items-center justify-center">
+                <MessageSquare className="text-muted-foreground" size={22} />
+              </div>
+              <div className="text-center">
+                <p className="font-semibold text-foreground">
+                  Tidak ada tagihan ditemukan
+                </p>
+                <p className="text-sm text-muted-foreground mt-0.5">
+                  Coba ubah filter bulan/tahun atau tambah tagihan baru
+                </p>
+              </div>
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto -mx-2">
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>Kamar</TableHead>
-                    <TableHead>Penyewa</TableHead>
-                    <TableHead className="text-center">Periode</TableHead>
-                    <TableHead className="text-center">Meteran</TableHead>
-                    <TableHead className="text-right">kWh</TableHead>
-                    <TableHead className="text-right">Listrik</TableHead>
-                    <TableHead className="text-right">Total</TableHead>
-                    <TableHead className="text-center">Status</TableHead>
-                    <TableHead className="text-center">Aksi</TableHead>
+                  <TableRow className="border-border/60">
+                    <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                      Kamar
+                    </TableHead>
+                    <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                      Penyewa
+                    </TableHead>
+                    <TableHead className="text-center text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                      Periode
+                    </TableHead>
+                    <TableHead className="text-center text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                      Meteran
+                    </TableHead>
+                    <TableHead className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                      kWh
+                    </TableHead>
+                    <TableHead className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                      Listrik
+                    </TableHead>
+                    <TableHead className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                      Total
+                    </TableHead>
+                    <TableHead className="text-center text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                      Status
+                    </TableHead>
+                    <TableHead className="text-center text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                      Aksi
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -327,49 +368,51 @@ export default function BillingListPage() {
                       : 0;
 
                     return (
-                      <TableRow key={bill.id}>
-                        <TableCell className="font-medium">
+                      <TableRow
+                        key={bill.id}
+                        className="border-border/40 hover:bg-muted/30 transition-colors"
+                      >
+                        <TableCell className="font-semibold text-foreground">
                           {bill.room?.room_name ?? bill.room_id}
                         </TableCell>
-                        <TableCell className="text-slate-500">
+                        <TableCell className="text-muted-foreground text-sm">
                           {bill.tenant_snapshot_name ?? "—"}
                         </TableCell>
-                        <TableCell className="text-center text-sm text-slate-500">
+                        <TableCell className="text-center text-sm text-muted-foreground">
                           {MONTH_NAMES[bill.month]}/{bill.year}
                         </TableCell>
                         <TableCell className="text-center">
-                          <span className="font-mono text-sm text-slate-500">
+                          <span className="font-mono text-xs text-muted-foreground">
                             {formatNumber(bill.meter_start)}
                           </span>
-                          <span className="text-slate-300 mx-1">→</span>
-                          <span className="font-mono text-sm font-semibold text-slate-700">
+                          <span className="text-muted-foreground/40 mx-1">→</span>
+                          <span className="font-mono text-xs font-semibold text-foreground">
                             {formatNumber(bill.meter_end)}
                           </span>
                         </TableCell>
-                        <TableCell className="text-right">
-                          {bill.kwh_used} kWh
+                        <TableCell className="text-right text-sm text-muted-foreground">
+                          {bill.kwh_used}
                         </TableCell>
-                        <TableCell className="text-right text-sm text-slate-600">
+                        <TableCell className="text-right text-sm text-muted-foreground">
                           {formatRupiah(electricCost)}
                         </TableCell>
-                        <TableCell className="text-right font-semibold">
+                        <TableCell className="text-right font-semibold text-foreground">
                           {formatRupiah(bill.total_amount)}
                         </TableCell>
                         <TableCell className="text-center">
                           {bill.status === "expired" ? (
-                            <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium bg-slate-100 text-slate-400 border border-slate-200 cursor-default">
+                            <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium bg-muted text-muted-foreground border border-border/60">
                               Kedaluwarsa
                             </span>
                           ) : (
                             <button
                               onClick={() => togglePaidStatus(bill)}
                               disabled={togglingId === bill.id}
-                              className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-colors hover:opacity-80 disabled:opacity-50"
-                              style={{
-                                background: bill.status === "paid" ? "#dcfce7" : "#fee2e2",
-                                color: bill.status === "paid" ? "#15803d" : "#dc2626",
-                                border: `1px solid ${bill.status === "paid" ? "#86efac" : "#fca5a5"}`,
-                              }}
+                              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium transition-all hover:opacity-80 disabled:opacity-50 border ${
+                                bill.status === "paid"
+                                  ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                  : "bg-red-50 text-red-700 border-red-200"
+                              }`}
                             >
                               {togglingId === bill.id ? (
                                 <RefreshCw size={11} className="animate-spin" />
@@ -388,7 +431,7 @@ export default function BillingListPage() {
                               variant="outline"
                               size="sm"
                               onClick={() => handleGenerateText(bill)}
-                              className="h-7 px-2 text-xs flex items-center gap-1"
+                              className="h-7 px-2 text-xs gap-1 border-border/60"
                             >
                               <MessageSquare size={11} />
                               Text
@@ -418,23 +461,23 @@ export default function BillingListPage() {
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <MessageSquare size={18} />
+              <MessageSquare size={16} />
               Teks Tagihan Siap Kirim
             </DialogTitle>
             <DialogDescription>
               Salin teks di bawah ini untuk dikirim ke penyewa
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
+          <div className="space-y-3">
             <Textarea
               value={generatedText}
               readOnly
-              className="min-h-60 font-mono text-sm resize-none bg-slate-50"
+              className="min-h-60 font-mono text-sm resize-none bg-muted/30"
               onClick={(e) => (e.target as HTMLTextAreaElement).select()}
             />
             <Button
               onClick={handleCopyText}
-              className="w-full flex items-center gap-2"
+              className="w-full gap-2"
             >
               <Copy size={14} />
               Salin ke Clipboard
@@ -447,16 +490,16 @@ export default function BillingListPage() {
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle className="text-red-600">Hapus Tagihan</DialogTitle>
+            <DialogTitle>Hapus Tagihan</DialogTitle>
             <DialogDescription>
               Anda yakin ingin menghapus tagihan{" "}
-              <span className="font-semibold text-slate-800">
+              <span className="font-semibold text-foreground">
                 {deletingBill?.room?.room_name} —{" "}
                 {deletingBill && MONTH_NAMES[deletingBill.month]}/
                 {deletingBill?.year}
               </span>{" "}
               senilai{" "}
-              <span className="font-semibold text-red-600">
+              <span className="font-semibold text-destructive">
                 {deletingBill && formatRupiah(deletingBill.total_amount)}
               </span>
               ?

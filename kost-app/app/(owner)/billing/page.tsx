@@ -20,7 +20,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Zap, Save, RefreshCw, Calculator, Info, CheckCircle2 } from "lucide-react";
+import {
+  Zap, Save, RefreshCw, Calculator, Info, CheckCircle2,
+} from "lucide-react";
 import { toast } from "sonner";
 
 const currentYear = new Date().getFullYear();
@@ -41,7 +43,6 @@ export default function BillingInputPage() {
   const [selectedYear, setSelectedYear] = useState(String(currentYear));
   const [entries, setEntries] = useState<RoomEntry[]>([]);
   const [loading, setLoading] = useState(false);
-  // Track loading state per kamar: { [roomId]: boolean }
   const [submittingIds, setSubmittingIds] = useState<Record<string, boolean>>({});
 
   const fetchData = useCallback(async () => {
@@ -121,7 +122,6 @@ export default function BillingInputPage() {
   }
 
   async function handleSaveOne(entry: RoomEntry) {
-    // Validasi
     if (entry.meter_end === "") {
       toast.warning(`Isi angka meteran untuk ${entry.room.room_name}`);
       return;
@@ -176,7 +176,6 @@ export default function BillingInputPage() {
         `${entry.room.room_name} — tagihan ${isNew ? "berhasil disimpan" : "berhasil diperbarui"}!`
       );
 
-      // Refresh hanya entry kamar ini agar meter_start terupdate
       fetchData();
     } catch (err) {
       toast.error(String(err));
@@ -185,28 +184,45 @@ export default function BillingInputPage() {
     }
   }
 
+  const savedCount = entries.filter((e) => e.existingBill).length;
+  const paidCount = entries.filter((e) => e.existingBill?.status === "paid").length;
+
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-slate-900">Input Tagihan</h1>
-        <p className="text-slate-500 mt-1">
-          Masukkan angka meteran listrik saat ini per kamar. Simpan tagihan
-          masing-masing kamar secara terpisah.
-        </p>
+      {/* Page header */}
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Input Tagihan</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Masukkan angka meteran listrik saat ini per kamar
+          </p>
+        </div>
+        {entries.length > 0 && (
+          <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted px-3 py-1.5 rounded-full w-fit">
+            <CheckCircle2 size={12} className="text-emerald-500" />
+            <span>
+              <span className="font-bold text-foreground">{paidCount}</span>/{entries.length} lunas
+              {savedCount > paidCount && (
+                <span className="ml-1 text-muted-foreground">
+                  · {savedCount} tersimpan
+                </span>
+              )}
+            </span>
+          </div>
+        )}
       </div>
 
-      {/* Period Selector */}
-      <Card>
-        <CardHeader className="pb-4">
-          <CardTitle className="text-base">Pilih Periode Tagihan</CardTitle>
+      {/* Period selector */}
+      <Card className="border-border/60 shadow-sm">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm font-semibold">Pilih Periode Tagihan</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-wrap items-end gap-4">
-            <div className="space-y-2 min-w-36">
-              <Label>Bulan</Label>
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="space-y-1.5 min-w-36">
+              <Label className="text-xs font-medium">Bulan</Label>
               <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-                <SelectTrigger>
+                <SelectTrigger className="h-9">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -218,10 +234,10 @@ export default function BillingInputPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2 min-w-28">
-              <Label>Tahun</Label>
+            <div className="space-y-1.5 min-w-28">
+              <Label className="text-xs font-medium">Tahun</Label>
               <Select value={selectedYear} onValueChange={setSelectedYear}>
-                <SelectTrigger>
+                <SelectTrigger className="h-9">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -235,27 +251,28 @@ export default function BillingInputPage() {
             </div>
             <Button
               variant="outline"
+              size="sm"
               onClick={fetchData}
               disabled={loading}
-              className="flex items-center gap-2"
+              className="gap-2 h-9"
             >
-              <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
+              <RefreshCw size={13} className={loading ? "animate-spin" : ""} />
               Muat Ulang
             </Button>
           </div>
         </CardContent>
       </Card>
 
-      {/* Daftar Kamar */}
+      {/* Room entries */}
       {loading ? (
         <div className="space-y-3">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="h-28 bg-slate-100 rounded-lg animate-pulse" />
+            <div key={i} className="h-24 bg-muted rounded-xl animate-pulse" />
           ))}
         </div>
       ) : entries.length === 0 ? (
-        <Card>
-          <CardContent className="text-center py-12 text-slate-400">
+        <Card className="border-dashed border-2 border-border/60 shadow-none">
+          <CardContent className="text-center py-12 text-muted-foreground">
             Belum ada kamar. Tambahkan kamar terlebih dahulu.
           </CardContent>
         </Card>
@@ -295,47 +312,48 @@ export default function BillingInputPage() {
             return (
               <Card
                 key={entry.room.id}
-                className={`transition-colors ${isPaid
-                    ? "border-green-200 bg-green-50"
+                className={`shadow-sm transition-colors ${
+                  isPaid
+                    ? "border-emerald-200/60 bg-emerald-50/20"
                     : isExisting
-                      ? "border-blue-200 bg-blue-50"
-                      : "border-slate-200"
-                  }`}
+                      ? "border-primary/20 bg-primary/5"
+                      : "border-border/60"
+                }`}
               >
                 <CardContent className="pt-4 pb-4">
                   <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-
-                    {/* Info Kamar */}
+                    {/* Room info */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <p className="font-semibold text-slate-800">
+                        <p className="font-semibold text-foreground">
                           {entry.room.room_name}
                         </p>
                         {isPaid && (
-                          <Badge className="bg-green-600 text-xs gap-1">
+                          <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 hover:bg-emerald-100 text-xs gap-1">
                             <CheckCircle2 size={10} /> Lunas
                           </Badge>
                         )}
                         {isExisting && !isPaid && (
                           <Badge variant="secondary" className="text-xs">
-                            Sudah Ada
+                            Tersimpan
                           </Badge>
                         )}
                       </div>
-                      <p className="text-sm text-slate-500">{entry.existingBill?.tenant_snapshot_name ?? "Belum ada penghuni"}</p>
-                      <p className="text-xs text-slate-400 mt-0.5">
+                      <p className="text-sm text-muted-foreground mt-0.5">
+                        {entry.existingBill?.tenant_snapshot_name ?? "Belum ada penghuni"}
+                      </p>
+                      <p className="text-xs text-muted-foreground/70 mt-0.5">
                         {formatRupiah(entry.room.base_price)} + iuran{" "}
                         {formatRupiah(entry.room.monthly_fee)} +{" "}
                         {formatRupiah(entry.room.price_per_kwh)}/kWh
                       </p>
                     </div>
 
-                    {/* Input Meteran */}
+                    {/* Meter inputs */}
                     <div className="flex flex-wrap items-end gap-3">
-
-                      {/* Meteran Awal */}
+                      {/* Meter start */}
                       <div className="space-y-1">
-                        <Label className="text-xs text-slate-500">
+                        <Label className="text-xs text-muted-foreground">
                           Meteran Awal
                         </Label>
                         {hasNoPrevHistory ? (
@@ -348,7 +366,7 @@ export default function BillingInputPage() {
                                 updateMeterStartOverride(entry.room.id, e.target.value)
                               }
                               min={0}
-                              className="w-28 text-right border-amber-300 focus-visible:ring-amber-400"
+                              className="w-28 text-right font-mono border-amber-300 focus-visible:ring-amber-400 h-9"
                               disabled={isPaid}
                             />
                             <p className="text-xs text-amber-600 flex items-center gap-1">
@@ -356,22 +374,22 @@ export default function BillingInputPage() {
                             </p>
                           </div>
                         ) : (
-                          <div className="w-28 h-9 flex items-center justify-end px-3 bg-slate-100 rounded-md border border-slate-200 text-sm font-mono font-semibold text-slate-600">
+                          <div className="w-28 h-9 flex items-center justify-end px-3 bg-muted rounded-md border border-border/60 text-sm font-mono font-semibold text-muted-foreground">
                             {entry.meter_start}
                           </div>
                         )}
                       </div>
 
-                      {/* Panah */}
-                      <div className="pb-1.5 text-slate-400 font-bold text-lg">→</div>
+                      {/* Arrow */}
+                      <div className="pb-1.5 text-muted-foreground font-bold text-lg">→</div>
 
-                      {/* Meteran Akhir */}
+                      {/* Meter end */}
                       <div className="space-y-1">
                         <Label
                           htmlFor={`meter-end-${entry.room.id}`}
                           className="text-xs font-semibold flex items-center gap-1"
                         >
-                          <Zap size={10} className="text-yellow-500" />
+                          <Zap size={10} className="text-amber-500" />
                           Meteran Sekarang
                         </Label>
                         <Input
@@ -383,38 +401,43 @@ export default function BillingInputPage() {
                             updateMeterEnd(entry.room.id, e.target.value)
                           }
                           min={0}
-                          className={`w-32 text-right font-mono ${meterTooSmall ? "border-red-400 focus-visible:ring-red-400" : ""}`}
+                          className={`w-32 text-right font-mono h-9 ${
+                            meterTooSmall
+                              ? "border-red-400 focus-visible:ring-red-400"
+                              : ""
+                          }`}
                           disabled={isPaid}
                         />
                       </div>
 
-                      {/* Preview Total */}
+                      {/* Preview */}
                       <div className="text-right min-w-36 pb-0.5">
                         {kwhPreview !== null ? (
                           <div>
-                            <div className="flex items-center gap-1 text-xs text-slate-400 justify-end">
+                            <div className="flex items-center gap-1 text-xs text-muted-foreground justify-end">
                               <Calculator size={11} />
                               {kwhPreview} kWh
                             </div>
-                            <p className="font-bold text-slate-800 text-base">
+                            <p className="font-bold text-foreground text-base">
                               {formatRupiah(totalPreview!)}
                             </p>
                           </div>
                         ) : meterTooSmall ? (
                           <p className="text-xs text-red-500 font-medium">
-                            Meteran akhir lebih kecil dari awal
+                            Meteran akhir lebih kecil
                           </p>
                         ) : (
-                          <p className="text-slate-300 text-sm">—</p>
+                          <p className="text-muted-foreground/40 text-sm">—</p>
                         )}
                       </div>
 
-                      {/* Tombol Simpan per Kamar */}
+                      {/* Save button */}
                       <Button
                         onClick={() => handleSaveOne(entry)}
                         disabled={isPaid || isSubmitting || entry.meter_end === ""}
                         size="sm"
-                        className="flex items-center gap-1.5 min-w-24"
+                        className="gap-1.5 min-w-24 h-9"
+                        variant={isPaid ? "secondary" : "default"}
                       >
                         {isSubmitting ? (
                           <RefreshCw size={13} className="animate-spin" />
