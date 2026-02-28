@@ -35,8 +35,10 @@ kost-app/
 │   │   │   └── page.tsx              # Room + tenant management (Client Component)
 │   │   ├── billing/
 │   │   │   └── page.tsx              # Monthly billing input (Client Component)
-│   │   └── billing-list/
-│   │       └── page.tsx              # Billing history & management (Client Component)
+│   │   ├── billing-list/
+│   │   │   └── page.tsx              # Billing history & management (Client Component)
+│   │   └── settings/
+│   │       └── page.tsx              # Kost info + bank payment details (Client Component)
 │   │
 │   ├── admin/                        # SuperAdmin panel (requires role=superadmin)
 │   │   ├── layout.tsx                # Admin layout: independent header + main (NO root Navbar)
@@ -65,6 +67,8 @@ kost-app/
 │       │       │   └── route.ts      # POST /api/rooms/[id]/checkout
 │       │       └── tenants/
 │       │           └── route.ts      # GET /api/rooms/[id]/tenants (history)
+│       ├── kost/
+│       │   └── route.ts              # GET /api/kost, PATCH /api/kost (kost info + bank details)
 │       ├── bills/
 │       │   ├── route.ts              # GET /api/bills, POST /api/bills (upsert)
 │       │   └── [id]/
@@ -82,8 +86,8 @@ kost-app/
 │   ├── Providers.tsx                 # SessionProvider wrapper for NextAuth
 │   └── ui/                          # shadcn/ui primitives
 │       ├── badge.tsx, button.tsx, card.tsx, dialog.tsx
-│       ├── input.tsx, label.tsx, select.tsx, separator.tsx
-│       ├── sonner.tsx, table.tsx, textarea.tsx, accordion.tsx
+│       ├── form.tsx, input.tsx, label.tsx, select.tsx, separator.tsx
+│       ├── sonner.tsx, table.tsx, textarea.tsx
 │
 ├── lib/
 │   ├── db.ts                         # All database query + admin functions
@@ -172,11 +176,14 @@ CREATE TABLE users (
 
 ```sql
 CREATE TABLE kosts (
-  id         VARCHAR(64)  PRIMARY KEY,
-  user_id    VARCHAR(64)  NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  name       VARCHAR(128) NOT NULL,
-  address    TEXT,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  id                   VARCHAR(64)  PRIMARY KEY,
+  user_id              VARCHAR(64)  NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name                 VARCHAR(128) NOT NULL,
+  address              TEXT,
+  bank_account_holder  VARCHAR(128),   -- configurable payment info
+  bank_name            VARCHAR(128),
+  bank_account_number  VARCHAR(64),
+  created_at           TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 ```
 
@@ -272,8 +279,10 @@ interface Room { id, room_name, kost_id, base_price, monthly_fee, price_per_kwh 
 interface Tenant { id, room_id, name, phone?, check_in_date, check_out_date?, notes? }
 interface Bill { id, room_id, month, year, meter_start, meter_end, kwh_used, total_amount, status: BillStatus, tenant_snapshot_name? }
 interface RoomWithTenant extends Room { active_tenant?: Tenant | null }
-interface OwnerWithKost extends User { kost_id, kost_name, kost_address, room_count }
+interface DatabaseData { rooms: Room[], bills: Bill[] }
 ```
+
+> **Note:** `OwnerWithKost` is exported from `lib/db.ts` (not `lib/types.ts`) since it is tightly coupled to the admin DB query shape.
 
 ### `lib/db.ts` — Database Functions
 
@@ -286,8 +295,9 @@ interface OwnerWithKost extends User { kost_id, kost_name, kost_address, room_co
 **Kosts:**
 | Function | Description |
 |---|---|
-| `getKostByUserId(userId)` | Get kost for an owner |
+| `getKostByUserId(userId)` | Get kost for an owner (incl. bank fields) |
 | `createKost(kost)` | Create a new kost |
+| `updateKost(kostId, data)` | Update kost name, address, and bank details |
 
 **Rooms:**
 | Function | Description |
@@ -315,29 +325,51 @@ interface OwnerWithKost extends User { kost_id, kost_name, kost_address, room_co
 | `updateBillStatus(id, status)` | Toggle paid/unpaid (blocked for expired) |
 | `deleteBill(id)` | Delete a bill |
 
+**Dashboard (legacy helper):**
+| Function | Description |
+|---|---|
+| `readData(kostId)` | Returns `{ rooms, bills }` for the dashboard server component |
+
 **Admin:**
 | Function | Description |
 |---|---|
-| `getAllOwners()` | List all owners with kost info and room count |
+| `getAllOwners()` | List all owners with kost info and room count; returns `OwnerWithKost[]` |
 | `hasSuperAdmin()` | Check if any superadmin exists |
 | `createOwnerUser(...)` | Create owner + kost in one call |
 | `updateOwnerUser(userId, data)` | Update owner + kost fields |
 | `deleteOwnerUser(userId)` | Delete owner + all data (cascade) |
 
+**Exported interface (defined in `lib/db.ts`):**
+```typescript
+interface OwnerWithKost extends User {
+  kost_id: string | null;
+  kost_name: string | null;
+  kost_address: string | null;
+  room_count: number;
+}
+```
+
 ### `lib/helpers.ts` — Business Logic
 
 | Function | Purpose |
 |---|---|
-| `calculateBillAmount(room, meterStart, meterEnd)` | Returns `{ kwh_used, total_amount }` |
+| `calculateBillAmount(kwhUsed, room)` | Returns `total_amount` (number): `base_price + monthly_fee + (kwhUsed × price_per_kwh)` |
 | `formatRupiah(amount)` | Formats as `Rp 1.500.000` |
 | `formatNumber(n)` | Dot-separated thousands |
-| `generateBillId(roomId, month, year)` | Deterministic `bill-{MM}{YYYY}-room{N}` |
-| `generateBillText(bill, room)` | Full Indonesian billing message |
-| `MONTH_NAMES` | Array of Indonesian month names |
+| `generateBillId(month, year, roomId)` | Deterministic `bill-{MM}{YYYY}-room{N}` |
+| `generateBillText(params)` | Full Indonesian billing message (copy-paste ready) |
+| `MONTH_NAMES` | `Record<number, string>` — 1-indexed Indonesian month names (1=Januari … 12=Desember) |
 
 ---
 
 ## 7. API Routes Reference
+
+### Kost Settings (owner-scoped)
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| `GET` | `/api/kost` | Owner | Get current owner's kost (incl. bank details) |
+| `PATCH` | `/api/kost` | Owner | Update kost name, address, bank details |
 
 ### Auth
 
@@ -388,6 +420,7 @@ interface OwnerWithKost extends User { kost_id, kost_name, kost_address, room_co
 | `/(owner)/rooms` | Client Component | fetch on mount |
 | `/(owner)/billing` | Client Component | fetch on mount + per-action |
 | `/(owner)/billing-list` | Client Component | fetch on filter change |
+| `/(owner)/settings` | Client Component | fetch on mount |
 | `/admin` | Client Component | fetch on mount |
 | `/login`, `/register` | Client Component | form-based |
 

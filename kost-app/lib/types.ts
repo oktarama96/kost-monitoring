@@ -14,6 +14,9 @@ export interface Kost {
   user_id: string;
   name: string;
   address?: string;
+  bank_account_holder?: string | null;
+  bank_name?: string | null;
+  bank_account_number?: string | null;
   created_at?: string;
 }
 

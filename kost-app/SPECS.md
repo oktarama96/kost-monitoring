@@ -140,7 +140,7 @@ Bills have three possible statuses (`status` field — replaces the old `is_paid
   - **Active tenant info** (name, phone, check-in date) if occupied
   - Occupancy badge: "Dihuni" / "Kosong"
   - Actions: Edit room details, Check-out tenant, Check-in new tenant, Delete room
-- **Tenant history accordion**: Expandable list of all past tenants for a room.
+- **Tenant history toggle**: Expandable list of all past tenants for a room (custom toggle button, not shadcn accordion).
 - **Add Room dialog**: Optional initial tenant section (name, phone, check-in date).
 - **Checkout dialog**: Input for departure date (default today) + optional notes. Expires unpaid bills automatically.
 - **Check-in dialog**: Name, phone, check-in date (default today).
@@ -160,7 +160,15 @@ Bills have three possible statuses (`status` field — replaces the old `is_paid
 - Generate WhatsApp-ready billing message per bill.
 - Delete bill (with confirmation).
 
-### 5.6 SuperAdmin Panel (`/admin`)
+### 5.6 Kost Settings (`/settings`)
+
+- Edit kost name and address.
+- Configure bank payment details: account holder name, bank name, account number.
+- All fields are plain text inputs.
+- Bank details are stored in the `kosts` table and used dynamically in bill text generation.
+- If bank details are empty, the bank section is omitted from the generated bill text.
+
+### 5.7 SuperAdmin Panel (`/admin`)
 
 - Separate layout from owner pages (independent of root layout).
 - Theme matches owner pages (white/slate/violet).
@@ -194,10 +202,10 @@ Pembayaran ke:
 [Account Number]
 ```
 
-**Hardcoded Payment Details** (current implementation):
-- Account Holder: `I KOMANG OKTARAMA BA`
-- Bank: `Bank Mandiri`
-- Account Number: `1450013849266`
+**Dynamic Payment Details** (configured via Pengaturan Kost page):
+- Stored in `kosts` table: `bank_account_holder`, `bank_name`, `bank_account_number`
+- If all three fields are empty, the bank section is omitted from the bill text
+- Configurable by the owner via `/settings`
 
 ---
 
@@ -211,6 +219,7 @@ Pembayaran ke:
 | Kelola Kamar | `/rooms` | Room + tenant management |
 | Input Tagihan | `/billing` | Monthly meter reading input |
 | Daftar Tagihan | `/billing-list` | Billing history and management |
+| Pengaturan | `/settings` | Kost info + bank payment details |
 
 The navbar shows the logged-in user's name, avatar initials, and a logout dropdown.
 

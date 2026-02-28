@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Card, CardContent, CardDescription, CardHeader, CardTitle,
+  Card, CardContent, CardHeader, CardTitle,
 } from "@/components/ui/card";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter,
@@ -17,6 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   Plus, Pencil, Trash2, BedDouble, Zap, Banknote, UserPlus,
   UserMinus, Phone, CalendarDays, ChevronDown, ChevronUp, History,
+  Users,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -46,7 +47,6 @@ export default function RoomsPage() {
   const [expandedHistory, setExpandedHistory] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
 
-  // Dialog states
   const [addEditDialog, setAddEditDialog] = useState(false);
   const [deleteDialog, setDeleteDialog] = useState(false);
   const [checkoutDialog, setCheckoutDialog] = useState(false);
@@ -92,7 +92,6 @@ export default function RoomsPage() {
     }
   }
 
-  // ── Add/Edit Room ──────────────────────────────────────────────
   function openAddDialog() {
     setEditingRoom(null);
     setRoomForm(emptyRoomForm);
@@ -158,7 +157,6 @@ export default function RoomsPage() {
     }
   }
 
-  // ── Delete Room ────────────────────────────────────────────────
   async function handleDelete() {
     if (!targetRoom) return;
     setSubmitting(true);
@@ -175,7 +173,6 @@ export default function RoomsPage() {
     }
   }
 
-  // ── Checkout ───────────────────────────────────────────────────
   async function handleCheckout() {
     if (!targetRoom) return;
     setSubmitting(true);
@@ -198,7 +195,6 @@ export default function RoomsPage() {
     }
   }
 
-  // ── Check-in ───────────────────────────────────────────────────
   async function handleCheckin(e: React.FormEvent) {
     e.preventDefault();
     if (!targetRoom) return;
@@ -218,7 +214,6 @@ export default function RoomsPage() {
       setCheckinDialog(false);
       setCheckinForm(emptyCheckinForm);
       fetchRooms();
-      // Reset history cache for this room
       setTenantHistory((prev) => { const n = { ...prev }; delete n[targetRoom.id]; return n; });
     } catch (err) {
       toast.error(String(err));
@@ -230,156 +225,206 @@ export default function RoomsPage() {
   const formatDate = (d: string) =>
     new Date(d).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
 
+  const occupiedCount = rooms.filter((r) => r.active_tenant).length;
+
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+      {/* Page header */}
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900">Kelola Kamar</h1>
-          <p className="text-slate-500 mt-1">Tambah, edit, hapus kamar dan kelola penghuni</p>
+          <h1 className="text-2xl font-bold text-foreground">Kelola Kamar</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Tambah, edit, hapus kamar dan kelola penghuni
+          </p>
         </div>
-        <Button onClick={openAddDialog} className="flex items-center gap-2">
-          <Plus size={16} /> Tambah Kamar
-        </Button>
+        <div className="flex items-center gap-3">
+          {rooms.length > 0 && (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted px-3 py-1.5 rounded-full">
+              <Users size={12} />
+              <span>
+                <span className="font-bold text-foreground">{occupiedCount}</span>/{rooms.length} terisi
+              </span>
+            </div>
+          )}
+          <Button onClick={openAddDialog} className="gap-2 font-semibold" size="sm">
+            <Plus size={15} /> Tambah Kamar
+          </Button>
+        </div>
       </div>
 
-      {/* Room Cards */}
+      {/* Room grid */}
       {loading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {[1, 2, 3].map((i) => (
-            <Card key={i} className="animate-pulse">
-              <CardHeader><div className="h-5 bg-slate-200 rounded w-3/4" /></CardHeader>
-              <CardContent><div className="space-y-2">
-                <div className="h-4 bg-slate-200 rounded" />
-                <div className="h-4 bg-slate-200 rounded" />
-              </div></CardContent>
+            <Card key={i} className="animate-pulse border-border/60">
+              <CardHeader>
+                <div className="h-5 bg-muted rounded w-3/4" />
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <div className="h-4 bg-muted rounded" />
+                  <div className="h-4 bg-muted rounded w-2/3" />
+                </div>
+              </CardContent>
             </Card>
           ))}
         </div>
       ) : rooms.length === 0 ? (
-        <Card className="text-center py-16">
-          <CardContent>
-            <BedDouble className="mx-auto mb-4 text-slate-300" size={48} />
-            <p className="text-slate-500 font-medium">Belum ada kamar</p>
-            <p className="text-slate-400 text-sm mt-1">Klik &quot;Tambah Kamar&quot; untuk mulai</p>
+        <Card className="border-dashed border-2 border-border/60 shadow-none">
+          <CardContent className="flex flex-col items-center justify-center py-16 gap-3">
+            <div className="w-14 h-14 rounded-2xl bg-muted flex items-center justify-center">
+              <BedDouble className="text-muted-foreground" size={28} />
+            </div>
+            <div className="text-center">
+              <p className="font-semibold text-foreground">Belum ada kamar</p>
+              <p className="text-sm text-muted-foreground mt-0.5">
+                Klik &quot;Tambah Kamar&quot; untuk mulai
+              </p>
+            </div>
+            <Button onClick={openAddDialog} variant="outline" size="sm" className="mt-1 gap-2">
+              <Plus size={14} /> Tambah Kamar
+            </Button>
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-start">
           {rooms.map((room) => {
             const tenant = room.active_tenant;
             const hasHistory = expandedHistory[room.id];
             const history = tenantHistory[room.id] ?? [];
 
             return (
-              <Card key={room.id} className="hover:shadow-md transition-shadow">
+              <Card
+                key={room.id}
+                className="border-border/60 shadow-sm hover:shadow-md transition-shadow duration-200 flex flex-col"
+              >
                 <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <CardTitle className="text-lg">{room.room_name}</CardTitle>
-                      <CardDescription className="mt-0.5">ID: {room.id}</CardDescription>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <CardTitle className="text-base font-bold truncate">
+                        {room.room_name}
+                      </CardTitle>
                     </div>
                     <Badge
-                      variant={tenant ? "default" : "secondary"}
-                      className={tenant ? "bg-green-600 hover:bg-green-700" : ""}
+                      className={
+                        tenant
+                          ? "bg-emerald-100 text-emerald-700 border-emerald-200 hover:bg-emerald-100 shrink-0"
+                          : "bg-muted text-muted-foreground border-border hover:bg-muted shrink-0"
+                      }
                     >
                       {tenant ? "Terisi" : "Kosong"}
                     </Badge>
                   </div>
                 </CardHeader>
-                <CardContent className="space-y-3">
+
+                <CardContent className="space-y-3 flex-1 flex flex-col">
                   {/* Tenant info */}
                   {tenant ? (
-                    <div className="bg-blue-50 rounded-lg p-3 space-y-1">
+                    <div className="rounded-lg border border-blue-100 bg-blue-50/60 p-3 space-y-1.5">
                       <div className="flex items-center gap-2 text-sm font-semibold text-blue-800">
-                        <BedDouble size={13} /> {tenant.name}
+                        <div className="w-6 h-6 rounded-full bg-blue-200 flex items-center justify-center text-blue-700 text-xs font-bold">
+                          {tenant.name[0]?.toUpperCase()}
+                        </div>
+                        {tenant.name}
                       </div>
                       {tenant.phone && (
-                        <div className="flex items-center gap-2 text-xs text-blue-600">
+                        <div className="flex items-center gap-1.5 text-xs text-blue-600">
                           <Phone size={11} /> {tenant.phone}
                         </div>
                       )}
-                      <div className="flex items-center gap-2 text-xs text-blue-600">
+                      <div className="flex items-center gap-1.5 text-xs text-blue-600">
                         <CalendarDays size={11} /> Masuk: {formatDate(tenant.check_in_date)}
                       </div>
                     </div>
                   ) : (
-                    <div className="bg-slate-50 rounded-lg p-3 text-sm text-slate-400 text-center">
+                    <div className="rounded-lg border border-dashed border-border bg-muted/30 p-3 text-sm text-muted-foreground text-center">
                       Tidak ada penghuni
                     </div>
                   )}
 
                   {/* Pricing */}
-                  <div className="bg-slate-50 rounded-lg p-3 space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="flex items-center gap-1.5 text-slate-500"><Banknote size={13} /> Harga Kamar</span>
-                      <span className="font-semibold">{formatRupiah(room.base_price)}</span>
-                    </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="flex items-center gap-1.5 text-slate-500"><Banknote size={13} /> Iuran Bulanan</span>
-                      <span className="font-semibold">{formatRupiah(room.monthly_fee)}</span>
-                    </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="flex items-center gap-1.5 text-slate-500"><Zap size={13} /> Harga / kWh</span>
-                      <span className="font-semibold">{formatRupiah(room.price_per_kwh)}</span>
-                    </div>
+                  <div className="rounded-lg border border-border/60 bg-muted/20 p-3 space-y-2">
+                    {[
+                      { icon: Banknote, label: "Harga Kamar", value: formatRupiah(room.base_price) },
+                      { icon: Banknote, label: "Iuran Bulanan", value: formatRupiah(room.monthly_fee) },
+                      { icon: Zap, label: "Harga / kWh", value: formatRupiah(room.price_per_kwh) },
+                    ].map(({ icon: Icon, label, value }) => (
+                      <div key={label} className="flex items-center justify-between text-xs">
+                        <span className="flex items-center gap-1.5 text-muted-foreground">
+                          <Icon size={12} /> {label}
+                        </span>
+                        <span className="font-semibold text-foreground">{value}</span>
+                      </div>
+                    ))}
                   </div>
 
-                  {/* Tenant actions */}
-                  <div className="flex gap-2">
+                  {/* Actions */}
+                  <div className="flex gap-2 mt-auto">
                     {tenant ? (
                       <Button
                         variant="outline"
                         size="sm"
-                        className="flex-1 text-red-600 border-red-200 hover:bg-red-50"
+                        className="flex-1 text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300 text-xs"
                         onClick={() => { setTargetRoom(room); setCheckoutDialog(true); }}
                       >
-                        <UserMinus size={13} className="mr-1" /> Pindah Keluar
+                        <UserMinus size={12} className="mr-1" /> Pindah Keluar
                       </Button>
                     ) : (
                       <Button
                         variant="outline"
                         size="sm"
-                        className="flex-1 text-green-700 border-green-200 hover:bg-green-50"
+                        className="flex-1 text-emerald-700 border-emerald-200 hover:bg-emerald-50 hover:border-emerald-300 text-xs"
                         onClick={() => { setTargetRoom(room); setCheckinForm(emptyCheckinForm); setCheckinDialog(true); }}
                       >
-                        <UserPlus size={13} className="mr-1" /> Tambah Penghuni
+                        <UserPlus size={12} className="mr-1" /> Tambah Penghuni
                       </Button>
                     )}
                     <Button
-                      variant="outline" size="sm" className="flex-1"
+                      variant="outline"
+                      size="sm"
+                      className="text-xs"
                       onClick={() => openEditDialog(room)}
                     >
-                      <Pencil size={13} className="mr-1" /> Edit
+                      <Pencil size={12} className="mr-1" /> Edit
                     </Button>
                     <Button
-                      variant="destructive" size="sm"
+                      variant="ghost"
+                      size="sm"
+                      className="text-red-500 hover:text-red-700 hover:bg-red-50 px-2"
                       onClick={() => { setTargetRoom(room); setDeleteDialog(true); }}
                     >
                       <Trash2 size={13} />
                     </Button>
                   </div>
 
-                  {/* Tenant history toggle */}
+                  {/* History toggle */}
                   <button
-                    className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-600 transition-colors w-full"
+                    className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors w-full pt-1"
                     onClick={() => toggleHistory(room.id)}
                   >
                     <History size={11} />
                     Histori Penghuni
-                    {hasHistory ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+                    {hasHistory ? <ChevronUp size={11} className="ml-auto" /> : <ChevronDown size={11} className="ml-auto" />}
                   </button>
 
                   {hasHistory && (
-                    <div className="border-t pt-2 space-y-1.5">
+                    <div className="border-t border-border/40 pt-2 space-y-1.5">
                       {history.length === 0 ? (
-                        <p className="text-xs text-slate-400">Belum ada histori</p>
+                        <p className="text-xs text-muted-foreground">Belum ada histori</p>
                       ) : (
                         history.map((t) => (
-                          <div key={t.id} className="text-xs text-slate-500 flex justify-between items-center py-1 border-b border-slate-100 last:border-0">
-                            <span className="font-medium text-slate-700">{t.name}</span>
-                            <span>
-                              {formatDate(t.check_in_date)} — {t.check_out_date ? formatDate(t.check_out_date) : <span className="text-green-600">Aktif</span>}
+                          <div
+                            key={t.id}
+                            className="text-xs text-muted-foreground flex justify-between items-center py-1.5 border-b border-border/30 last:border-0"
+                          >
+                            <span className="font-medium text-foreground">{t.name}</span>
+                            <span className="text-right">
+                              {formatDate(t.check_in_date)} —{" "}
+                              {t.check_out_date ? (
+                                formatDate(t.check_out_date)
+                              ) : (
+                                <span className="text-emerald-600 font-medium">Aktif</span>
+                              )}
                             </span>
                           </div>
                         ))
@@ -399,56 +444,105 @@ export default function RoomsPage() {
           <DialogHeader>
             <DialogTitle>{editingRoom ? "Edit Kamar" : "Tambah Kamar Baru"}</DialogTitle>
             <DialogDescription>
-              {editingRoom ? `Perbarui data ${editingRoom.room_name}` : "Isi detail kamar yang ingin ditambahkan"}
+              {editingRoom
+                ? `Perbarui data ${editingRoom.room_name}`
+                : "Isi detail kamar yang ingin ditambahkan"}
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleRoomSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="room_name">Nama Kamar</Label>
-              <Input id="room_name" placeholder="cth: Kamar A1" value={roomForm.room_name}
-                onChange={(e) => setRoomForm((f) => ({ ...f, room_name: e.target.value }))} required />
+              <Input
+                id="room_name"
+                placeholder="cth: Kamar A1"
+                value={roomForm.room_name}
+                onChange={(e) => setRoomForm((f) => ({ ...f, room_name: e.target.value }))}
+                required
+              />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label htmlFor="base_price">Harga Kamar (Rp)</Label>
-                <Input id="base_price" type="number" placeholder="1500000" value={roomForm.base_price}
-                  onChange={(e) => setRoomForm((f) => ({ ...f, base_price: e.target.value }))} min={0} required />
+                <Input
+                  id="base_price"
+                  type="number"
+                  placeholder="1500000"
+                  value={roomForm.base_price}
+                  onChange={(e) => setRoomForm((f) => ({ ...f, base_price: e.target.value }))}
+                  min={0}
+                  required
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="monthly_fee">Iuran Bulanan (Rp)</Label>
-                <Input id="monthly_fee" type="number" placeholder="50000" value={roomForm.monthly_fee}
-                  onChange={(e) => setRoomForm((f) => ({ ...f, monthly_fee: e.target.value }))} min={0} required />
+                <Input
+                  id="monthly_fee"
+                  type="number"
+                  placeholder="50000"
+                  value={roomForm.monthly_fee}
+                  onChange={(e) => setRoomForm((f) => ({ ...f, monthly_fee: e.target.value }))}
+                  min={0}
+                  required
+                />
               </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="price_per_kwh">Harga per kWh (Rp)</Label>
-              <Input id="price_per_kwh" type="number" placeholder="2000" value={roomForm.price_per_kwh}
-                onChange={(e) => setRoomForm((f) => ({ ...f, price_per_kwh: e.target.value }))} min={0} required />
+              <Input
+                id="price_per_kwh"
+                type="number"
+                placeholder="2000"
+                value={roomForm.price_per_kwh}
+                onChange={(e) => setRoomForm((f) => ({ ...f, price_per_kwh: e.target.value }))}
+                min={0}
+                required
+              />
             </div>
             {!editingRoom && (
-              <div className="border-t pt-3 space-y-3">
-                <p className="text-xs font-semibold text-slate-500 uppercase">Penghuni Awal (Opsional)</p>
-                <div className="grid grid-cols-2 gap-4">
+              <div className="border-t border-border/60 pt-4 space-y-3">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">
+                  Penghuni Awal (Opsional)
+                </p>
+                <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
                     <Label htmlFor="new_tenant_name">Nama Penghuni</Label>
-                    <Input id="new_tenant_name" placeholder="Budi Santoso" value={roomForm.tenant_name}
-                      onChange={(e) => setRoomForm((f) => ({ ...f, tenant_name: e.target.value }))} />
+                    <Input
+                      id="new_tenant_name"
+                      placeholder="Budi Santoso"
+                      value={roomForm.tenant_name}
+                      onChange={(e) => setRoomForm((f) => ({ ...f, tenant_name: e.target.value }))}
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="new_tenant_phone">No. HP</Label>
-                    <Input id="new_tenant_phone" placeholder="08xx" value={roomForm.tenant_phone}
-                      onChange={(e) => setRoomForm((f) => ({ ...f, tenant_phone: e.target.value }))} />
+                    <Input
+                      id="new_tenant_phone"
+                      placeholder="08xx"
+                      value={roomForm.tenant_phone}
+                      onChange={(e) => setRoomForm((f) => ({ ...f, tenant_phone: e.target.value }))}
+                    />
                   </div>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="new_tenant_checkin">Tanggal Masuk</Label>
-                  <Input id="new_tenant_checkin" type="date" value={roomForm.tenant_check_in_date}
-                    onChange={(e) => setRoomForm((f) => ({ ...f, tenant_check_in_date: e.target.value }))} />
+                  <Input
+                    id="new_tenant_checkin"
+                    type="date"
+                    value={roomForm.tenant_check_in_date}
+                    onChange={(e) => setRoomForm((f) => ({ ...f, tenant_check_in_date: e.target.value }))}
+                  />
                 </div>
               </div>
             )}
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setAddEditDialog(false)} disabled={submitting}>Batal</Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setAddEditDialog(false)}
+                disabled={submitting}
+              >
+                Batal
+              </Button>
               <Button type="submit" disabled={submitting}>
                 {submitting ? "Menyimpan..." : editingRoom ? "Simpan Perubahan" : "Tambah Kamar"}
               </Button>
@@ -461,13 +555,21 @@ export default function RoomsPage() {
       <Dialog open={deleteDialog} onOpenChange={setDeleteDialog}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle className="text-red-600">Hapus Kamar</DialogTitle>
+            <DialogTitle>Hapus Kamar</DialogTitle>
             <DialogDescription>
-              Yakin ingin menghapus <span className="font-semibold text-slate-800">{targetRoom?.room_name}</span>? Semua data tagihan kamar ini juga akan terhapus.
+              Yakin ingin menghapus{" "}
+              <span className="font-semibold text-foreground">{targetRoom?.room_name}</span>?
+              Semua data tagihan kamar ini juga akan terhapus.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteDialog(false)} disabled={submitting}>Batal</Button>
+            <Button
+              variant="outline"
+              onClick={() => setDeleteDialog(false)}
+              disabled={submitting}
+            >
+              Batal
+            </Button>
             <Button variant="destructive" onClick={handleDelete} disabled={submitting}>
               {submitting ? "Menghapus..." : "Ya, Hapus"}
             </Button>
@@ -479,28 +581,50 @@ export default function RoomsPage() {
       <Dialog open={checkoutDialog} onOpenChange={setCheckoutDialog}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle className="text-orange-600">Penghuni Pindah Keluar</DialogTitle>
+            <DialogTitle>Penghuni Pindah Keluar</DialogTitle>
             <DialogDescription>
-              <span className="font-semibold text-slate-800">{targetRoom?.active_tenant?.name}</span> akan keluar dari {targetRoom?.room_name}.<br />
-              Tagihan yang belum lunas akan otomatis ditandai <span className="font-semibold text-gray-600">Kedaluwarsa</span>.
+              <span className="font-semibold text-foreground">
+                {targetRoom?.active_tenant?.name}
+              </span>{" "}
+              akan keluar dari {targetRoom?.room_name}. Tagihan yang belum lunas akan otomatis
+              ditandai <span className="font-semibold">Kedaluwarsa</span>.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div className="space-y-2">
               <Label htmlFor="checkout_date">Tanggal Keluar</Label>
-              <Input id="checkout_date" type="date" value={checkoutDate}
-                onChange={(e) => setCheckoutDate(e.target.value)} />
+              <Input
+                id="checkout_date"
+                type="date"
+                value={checkoutDate}
+                onChange={(e) => setCheckoutDate(e.target.value)}
+              />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="checkout_notes">Catatan <span className="text-slate-400 font-normal">(opsional)</span></Label>
-              <Input id="checkout_notes" placeholder="cth: Pindah kota, habis kontrak..." value={checkoutNotes}
-                onChange={(e) => setCheckoutNotes(e.target.value)} />
+              <Label htmlFor="checkout_notes">
+                Catatan{" "}
+                <span className="text-muted-foreground font-normal">(opsional)</span>
+              </Label>
+              <Input
+                id="checkout_notes"
+                placeholder="cth: Pindah kota, habis kontrak..."
+                value={checkoutNotes}
+                onChange={(e) => setCheckoutNotes(e.target.value)}
+              />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setCheckoutDialog(false)} disabled={submitting}>Batal</Button>
             <Button
-              className="bg-orange-600 hover:bg-orange-700" onClick={handleCheckout} disabled={submitting}
+              variant="outline"
+              onClick={() => setCheckoutDialog(false)}
+              disabled={submitting}
+            >
+              Batal
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleCheckout}
+              disabled={submitting}
             >
               {submitting ? "Memproses..." : "Konfirmasi Keluar"}
             </Button>
@@ -512,28 +636,55 @@ export default function RoomsPage() {
       <Dialog open={checkinDialog} onOpenChange={setCheckinDialog}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle className="text-green-700">Tambah Penghuni Baru</DialogTitle>
-            <DialogDescription>Daftarkan penghuni baru untuk {targetRoom?.room_name}</DialogDescription>
+            <DialogTitle>Tambah Penghuni Baru</DialogTitle>
+            <DialogDescription>
+              Daftarkan penghuni baru untuk{" "}
+              <span className="font-semibold text-foreground">{targetRoom?.room_name}</span>
+            </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleCheckin} className="space-y-3">
-            <div className="space-y-1">
+            <div className="space-y-2">
               <Label htmlFor="ci_name">Nama Penghuni</Label>
-              <Input id="ci_name" placeholder="Nama lengkap" value={checkinForm.name}
-                onChange={(e) => setCheckinForm((f) => ({ ...f, name: e.target.value }))} required />
+              <Input
+                id="ci_name"
+                placeholder="Nama lengkap"
+                value={checkinForm.name}
+                onChange={(e) => setCheckinForm((f) => ({ ...f, name: e.target.value }))}
+                required
+              />
             </div>
-            <div className="space-y-1">
-              <Label htmlFor="ci_phone">No. HP <span className="text-slate-400 font-normal">(opsional)</span></Label>
-              <Input id="ci_phone" placeholder="08xx-xxxx-xxxx" value={checkinForm.phone}
-                onChange={(e) => setCheckinForm((f) => ({ ...f, phone: e.target.value }))} />
+            <div className="space-y-2">
+              <Label htmlFor="ci_phone">
+                No. HP{" "}
+                <span className="text-muted-foreground font-normal">(opsional)</span>
+              </Label>
+              <Input
+                id="ci_phone"
+                placeholder="08xx-xxxx-xxxx"
+                value={checkinForm.phone}
+                onChange={(e) => setCheckinForm((f) => ({ ...f, phone: e.target.value }))}
+              />
             </div>
-            <div className="space-y-1">
+            <div className="space-y-2">
               <Label htmlFor="ci_date">Tanggal Masuk</Label>
-              <Input id="ci_date" type="date" value={checkinForm.check_in_date}
-                onChange={(e) => setCheckinForm((f) => ({ ...f, check_in_date: e.target.value }))} required />
+              <Input
+                id="ci_date"
+                type="date"
+                value={checkinForm.check_in_date}
+                onChange={(e) => setCheckinForm((f) => ({ ...f, check_in_date: e.target.value }))}
+                required
+              />
             </div>
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setCheckinDialog(false)} disabled={submitting}>Batal</Button>
-              <Button type="submit" className="bg-green-600 hover:bg-green-700" disabled={submitting}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setCheckinDialog(false)}
+                disabled={submitting}
+              >
+                Batal
+              </Button>
+              <Button type="submit" disabled={submitting}>
                 {submitting ? "Mendaftarkan..." : "Daftarkan"}
               </Button>
             </DialogFooter>

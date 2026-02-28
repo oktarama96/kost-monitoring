@@ -58,3 +58,9 @@ ALTER TABLE bills
 ALTER TABLE users
   ADD COLUMN IF NOT EXISTS role VARCHAR(32) NOT NULL DEFAULT 'owner';
 
+-- ─── 7. Tambah kolom bank details ke kosts ──────────────────────────────────
+ALTER TABLE kosts
+  ADD COLUMN IF NOT EXISTS bank_account_holder VARCHAR(128),
+  ADD COLUMN IF NOT EXISTS bank_name           VARCHAR(128),
+  ADD COLUMN IF NOT EXISTS bank_account_number VARCHAR(64);
+

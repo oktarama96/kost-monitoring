@@ -123,60 +123,73 @@ export default function AdminPage() {
         ? new Date(d).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })
         : "—";
 
+    const totalRooms = owners.reduce((sum, o) => sum + (o.room_count ?? 0), 0);
+
     return (
         <div className="space-y-6">
-            {/* Header */}
-            <div className="flex items-center justify-between">
+            {/* Page header */}
+            <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-800">Manajemen Penyedia Kost</h1>
-                    <p className="text-slate-500 text-sm mt-1">Kelola akun pengelola kost yang terdaftar</p>
+                    <h1 className="text-2xl font-bold text-foreground">Manajemen Penyedia Kost</h1>
+                    <p className="text-sm text-muted-foreground mt-0.5">
+                        Kelola akun pengelola kost yang terdaftar
+                    </p>
                 </div>
                 <div className="flex items-center gap-2">
-                    <Button variant="outline" size="sm" onClick={fetchOwners} disabled={loading}>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={fetchOwners}
+                        disabled={loading}
+                        className="gap-1.5"
+                    >
                         <RefreshCw size={13} className={loading ? "animate-spin" : ""} />
+                        Refresh
                     </Button>
-                    <Button onClick={() => { setForm(emptyForm); setAddDialog(true); }}
-                        size="sm" className="flex items-center gap-2 bg-violet-600 hover:bg-violet-700">
-                        <Plus size={15} /> Tambah Owner
+                    <Button
+                        onClick={() => { setForm(emptyForm); setAddDialog(true); }}
+                        size="sm"
+                        className="gap-2"
+                    >
+                        <Plus size={14} /> Tambah Owner
                     </Button>
                 </div>
             </div>
 
             {/* Stats */}
             <div className="grid grid-cols-2 gap-4">
-                <Card>
-                    <CardContent className="pt-5 flex items-center gap-4">
-                        <div className="w-10 h-10 rounded-lg bg-violet-100 flex items-center justify-center">
-                            <Users size={20} className="text-violet-600" />
+                <Card className="border-border/60 shadow-sm">
+                    <CardContent className="pt-5 pb-4 flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-xl bg-violet-100 flex items-center justify-center shrink-0">
+                            <Users size={18} className="text-violet-600" />
                         </div>
                         <div>
-                            <p className="text-2xl font-bold text-slate-800">{owners.length}</p>
-                            <p className="text-sm text-slate-500">Total Penyedia Kost</p>
+                            <p className="text-2xl font-bold text-foreground">{owners.length}</p>
+                            <p className="text-xs text-muted-foreground">Total Penyedia Kost</p>
                         </div>
                     </CardContent>
                 </Card>
-                <Card>
-                    <CardContent className="pt-5 flex items-center gap-4">
-                        <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
-                            <BedDouble size={20} className="text-blue-600" />
+                <Card className="border-border/60 shadow-sm">
+                    <CardContent className="pt-5 pb-4 flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center shrink-0">
+                            <BedDouble size={18} className="text-blue-600" />
                         </div>
                         <div>
-                            <p className="text-2xl font-bold text-slate-800">
-                                {owners.reduce((sum, o) => sum + (o.room_count ?? 0), 0)}
-                            </p>
-                            <p className="text-sm text-slate-500">Total Kamar Terdaftar</p>
+                            <p className="text-2xl font-bold text-foreground">{totalRooms}</p>
+                            <p className="text-xs text-muted-foreground">Total Kamar Terdaftar</p>
                         </div>
                     </CardContent>
                 </Card>
             </div>
 
             {/* Table */}
-            <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-slate-800">
-                        <Building2 size={18} className="text-violet-500" /> Daftar Penyedia Kost
+            <Card className="border-border/60 shadow-sm">
+                <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                        <Building2 size={15} className="text-violet-500" />
+                        Daftar Penyedia Kost
                     </CardTitle>
-                    <CardDescription>
+                    <CardDescription className="text-xs">
                         Klik Hapus untuk menghapus akun beserta seluruh data kamar dan tagihannya
                     </CardDescription>
                 </CardHeader>
@@ -184,62 +197,75 @@ export default function AdminPage() {
                     {loading ? (
                         <div className="space-y-3">
                             {[1, 2, 3].map(i => (
-                                <div key={i} className="h-12 bg-slate-100 rounded animate-pulse" />
+                                <div key={i} className="h-12 bg-muted rounded-lg animate-pulse" />
                             ))}
                         </div>
                     ) : owners.length === 0 ? (
-                        <div className="text-center py-12 text-slate-400">
-                            <Users className="mx-auto mb-3 opacity-30" size={40} />
-                            <p>Belum ada penyedia kost terdaftar</p>
+                        <div className="flex flex-col items-center justify-center py-12 gap-3">
+                            <div className="w-12 h-12 rounded-2xl bg-muted flex items-center justify-center">
+                                <Users className="text-muted-foreground" size={22} />
+                            </div>
+                            <p className="text-sm text-muted-foreground">
+                                Belum ada penyedia kost terdaftar
+                            </p>
                         </div>
                     ) : (
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Nama</TableHead>
-                                    <TableHead>Email</TableHead>
-                                    <TableHead>Nama Kost</TableHead>
-                                    <TableHead>Alamat</TableHead>
-                                    <TableHead className="text-center">Kamar</TableHead>
-                                    <TableHead>Terdaftar</TableHead>
-                                    <TableHead className="text-center">Aksi</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {owners.map((owner) => (
-                                    <TableRow key={owner.id}>
-                                        <TableCell className="font-medium text-slate-800">{owner.name}</TableCell>
-                                        <TableCell className="text-slate-600 text-sm">{owner.email}</TableCell>
-                                        <TableCell className="text-slate-600 text-sm">{owner.kost_name ?? "—"}</TableCell>
-                                        <TableCell className="text-slate-500 text-sm max-w-40 truncate">{owner.kost_address ?? "—"}</TableCell>
-                                        <TableCell className="text-center">
-                                            <Badge variant="secondary" className="text-xs">
-                                                {owner.room_count} kamar
-                                            </Badge>
-                                        </TableCell>
-                                        <TableCell className="text-slate-500 text-sm">{formatDate(owner.created_at)}</TableCell>
-                                        <TableCell>
-                                            <div className="flex items-center justify-center gap-1">
-                                                <Button variant="ghost" size="sm" onClick={() => openEdit(owner)}
-                                                    className="h-7 w-7 p-0 text-slate-500 hover:text-slate-800">
-                                                    <Pencil size={13} />
-                                                </Button>
-                                                <Button variant="ghost" size="sm"
-                                                    onClick={() => { setTargetOwner(owner); setDeleteDialog(true); }}
-                                                    className="h-7 w-7 p-0 text-red-400 hover:text-red-600 hover:bg-red-50">
-                                                    <Trash2 size={13} />
-                                                </Button>
-                                            </div>
-                                        </TableCell>
+                        <div className="overflow-x-auto -mx-2">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow className="border-border/60">
+                                        <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Nama</TableHead>
+                                        <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Email</TableHead>
+                                        <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Nama Kost</TableHead>
+                                        <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Alamat</TableHead>
+                                        <TableHead className="text-center text-xs font-semibold text-muted-foreground uppercase tracking-wide">Kamar</TableHead>
+                                        <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Terdaftar</TableHead>
+                                        <TableHead className="text-center text-xs font-semibold text-muted-foreground uppercase tracking-wide">Aksi</TableHead>
                                     </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
+                                </TableHeader>
+                                <TableBody>
+                                    {owners.map((owner) => (
+                                        <TableRow key={owner.id} className="border-border/40 hover:bg-muted/30 transition-colors">
+                                            <TableCell className="font-semibold text-foreground">{owner.name}</TableCell>
+                                            <TableCell className="text-muted-foreground text-sm">{owner.email}</TableCell>
+                                            <TableCell className="text-muted-foreground text-sm">{owner.kost_name ?? "—"}</TableCell>
+                                            <TableCell className="text-muted-foreground text-sm max-w-40 truncate">{owner.kost_address ?? "—"}</TableCell>
+                                            <TableCell className="text-center">
+                                                <Badge variant="secondary" className="text-xs">
+                                                    {owner.room_count} kamar
+                                                </Badge>
+                                            </TableCell>
+                                            <TableCell className="text-muted-foreground text-sm">{formatDate(owner.created_at)}</TableCell>
+                                            <TableCell>
+                                                <div className="flex items-center justify-center gap-1">
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={() => openEdit(owner)}
+                                                        className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+                                                    >
+                                                        <Pencil size={13} />
+                                                    </Button>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={() => { setTargetOwner(owner); setDeleteDialog(true); }}
+                                                        className="h-7 w-7 p-0 text-red-400 hover:text-red-600 hover:bg-red-50"
+                                                    >
+                                                        <Trash2 size={13} />
+                                                    </Button>
+                                                </div>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </div>
                     )}
                 </CardContent>
             </Card>
 
-            {/* ── Tambah Dialog ── */}
+            {/* ── Add Dialog ── */}
             <Dialog open={addDialog} onOpenChange={setAddDialog}>
                 <DialogContent className="sm:max-w-md">
                     <DialogHeader>
@@ -249,8 +275,8 @@ export default function AdminPage() {
                         </DialogDescription>
                     </DialogHeader>
                     <form onSubmit={handleAdd} className="space-y-4">
-                        <div className="border-b pb-4 space-y-3">
-                            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Akun</p>
+                        <div className="border-b border-border/60 pb-4 space-y-3">
+                            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">Akun</p>
                             <Field label="Nama" id="a_name" placeholder="Nama pengelola"
                                 value={form.name} onChange={v => setForm(f => ({ ...f, name: v }))} required />
                             <Field label="Email" id="a_email" type="email" placeholder="email@example.com"
@@ -259,7 +285,7 @@ export default function AdminPage() {
                                 value={form.password} onChange={v => setForm(f => ({ ...f, password: v }))} required />
                         </div>
                         <div className="space-y-3">
-                            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Informasi Kost</p>
+                            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">Informasi Kost</p>
                             <Field label="Nama Kost" id="a_kost" placeholder="cth: Kost Makmur"
                                 value={form.kost_name} onChange={v => setForm(f => ({ ...f, kost_name: v }))} required />
                             <Field label="Alamat" id="a_addr" placeholder="Jl. ... (opsional)"
@@ -267,7 +293,7 @@ export default function AdminPage() {
                         </div>
                         <DialogFooter>
                             <Button type="button" variant="outline" onClick={() => setAddDialog(false)}>Batal</Button>
-                            <Button type="submit" disabled={submitting} className="bg-violet-600 hover:bg-violet-700">
+                            <Button type="submit" disabled={submitting}>
                                 {submitting ? "Menyimpan..." : "Buat Akun"}
                             </Button>
                         </DialogFooter>
@@ -281,12 +307,13 @@ export default function AdminPage() {
                     <DialogHeader>
                         <DialogTitle>Edit Penyedia Kost</DialogTitle>
                         <DialogDescription>
-                            Perbarui data <span className="font-semibold">{targetOwner?.name}</span>
+                            Perbarui data{" "}
+                            <span className="font-semibold text-foreground">{targetOwner?.name}</span>
                         </DialogDescription>
                     </DialogHeader>
                     <form onSubmit={handleEdit} className="space-y-4">
-                        <div className="border-b pb-4 space-y-3">
-                            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Akun</p>
+                        <div className="border-b border-border/60 pb-4 space-y-3">
+                            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">Akun</p>
                             <Field label="Nama" id="e_name" value={form.name}
                                 onChange={v => setForm(f => ({ ...f, name: v }))} required />
                             <Field label="Email" id="e_email" type="email" value={form.email}
@@ -295,7 +322,7 @@ export default function AdminPage() {
                                 value={form.password} onChange={v => setForm(f => ({ ...f, password: v }))} />
                         </div>
                         <div className="space-y-3">
-                            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Informasi Kost</p>
+                            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">Informasi Kost</p>
                             <Field label="Nama Kost" id="e_kost" value={form.kost_name}
                                 onChange={v => setForm(f => ({ ...f, kost_name: v }))} required />
                             <Field label="Alamat" id="e_addr" value={form.kost_address}
@@ -303,7 +330,7 @@ export default function AdminPage() {
                         </div>
                         <DialogFooter>
                             <Button type="button" variant="outline" onClick={() => setEditDialog(false)}>Batal</Button>
-                            <Button type="submit" disabled={submitting} className="bg-violet-600 hover:bg-violet-700">
+                            <Button type="submit" disabled={submitting}>
                                 {submitting ? "Menyimpan..." : "Simpan Perubahan"}
                             </Button>
                         </DialogFooter>
@@ -315,10 +342,10 @@ export default function AdminPage() {
             <Dialog open={deleteDialog} onOpenChange={setDeleteDialog}>
                 <DialogContent className="sm:max-w-sm">
                     <DialogHeader>
-                        <DialogTitle className="text-red-600">Hapus Penyedia Kost</DialogTitle>
+                        <DialogTitle>Hapus Penyedia Kost</DialogTitle>
                         <DialogDescription>
                             Yakin ingin menghapus akun{" "}
-                            <span className="font-semibold text-slate-800">{targetOwner?.name}</span>?{" "}
+                            <span className="font-semibold text-foreground">{targetOwner?.name}</span>?{" "}
                             Semua data kost, kamar, penghuni, dan tagihan akan ikut terhapus permanen.
                         </DialogDescription>
                     </DialogHeader>
@@ -343,9 +370,15 @@ function Field({
 }) {
     return (
         <div className="space-y-1.5">
-            <Label htmlFor={id} className="text-sm">{label}</Label>
-            <Input id={id} type={type} value={value} placeholder={placeholder}
-                onChange={e => onChange(e.target.value)} required={required} />
+            <Label htmlFor={id} className="text-sm font-medium">{label}</Label>
+            <Input
+                id={id}
+                type={type}
+                value={value}
+                placeholder={placeholder}
+                onChange={e => onChange(e.target.value)}
+                required={required}
+            />
         </div>
     );
 }

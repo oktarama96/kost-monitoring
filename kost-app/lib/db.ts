@@ -23,7 +23,8 @@ export async function createUser(user: Omit<User, "created_at">): Promise<User> 
 
 export async function getKostByUserId(userId: string): Promise<Kost | null> {
   const { rows } = await sql<Kost>`
-    SELECT id, user_id, name, address FROM kosts WHERE user_id = ${userId} LIMIT 1
+    SELECT id, user_id, name, address, bank_account_holder, bank_name, bank_account_number
+    FROM kosts WHERE user_id = ${userId} LIMIT 1
   `;
   return rows[0] ?? null;
 }
@@ -32,9 +33,32 @@ export async function createKost(kost: Omit<Kost, "created_at">): Promise<Kost> 
   const { rows } = await sql<Kost>`
     INSERT INTO kosts (id, user_id, name, address)
     VALUES (${kost.id}, ${kost.user_id}, ${kost.name}, ${kost.address ?? null})
-    RETURNING id, user_id, name, address
+    RETURNING id, user_id, name, address, bank_account_holder, bank_name, bank_account_number
   `;
   return rows[0];
+}
+
+export async function updateKost(
+  kostId: string,
+  data: {
+    name: string;
+    address: string | null;
+    bank_account_holder: string | null;
+    bank_name: string | null;
+    bank_account_number: string | null;
+  }
+): Promise<Kost | null> {
+  const { rows } = await sql<Kost>`
+    UPDATE kosts SET
+      name                 = ${data.name},
+      address              = ${data.address},
+      bank_account_holder  = ${data.bank_account_holder},
+      bank_name            = ${data.bank_name},
+      bank_account_number  = ${data.bank_account_number}
+    WHERE id = ${kostId}
+    RETURNING id, user_id, name, address, bank_account_holder, bank_name, bank_account_number
+  `;
+  return rows[0] ?? null;
 }
 
 // ─── Rooms ───────────────────────────────────────────────────────────────────
