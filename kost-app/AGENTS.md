@@ -9,6 +9,7 @@
 **Always read these first before making any changes:**
 - [`SPECS.md`](./SPECS.md) — Business logic, feature specs, domain rules, user roles
 - [`ARCHITECTURE.md`](./ARCHITECTURE.md) — File structure, DB schema, API reference, auth flow, data flow
+- **Read all skills from `.skills` directory** — Agent skill definitions that extend capabilities for specialized tasks
 
 ---
 
