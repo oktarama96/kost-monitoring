@@ -14,6 +14,7 @@ import {
   ChevronDown,
   Menu,
   X,
+  Settings,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -22,6 +23,7 @@ const navItems = [
   { href: "/rooms", label: "Kelola Kamar", icon: BedDouble },
   { href: "/billing", label: "Input Tagihan", icon: FileInput },
   { href: "/billing-list", label: "Daftar Tagihan", icon: ClipboardList },
+  { href: "/settings", label: "Pengaturan", icon: Settings },
 ];
 
 export default function Navbar() {

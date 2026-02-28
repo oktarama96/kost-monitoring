@@ -35,8 +35,10 @@ kost-app/
 │   │   │   └── page.tsx              # Room + tenant management (Client Component)
 │   │   ├── billing/
 │   │   │   └── page.tsx              # Monthly billing input (Client Component)
-│   │   └── billing-list/
-│   │       └── page.tsx              # Billing history & management (Client Component)
+│   │   ├── billing-list/
+│   │   │   └── page.tsx              # Billing history & management (Client Component)
+│   │   └── settings/
+│   │       └── page.tsx              # Kost info + bank payment details (Client Component)
 │   │
 │   ├── admin/                        # SuperAdmin panel (requires role=superadmin)
 │   │   ├── layout.tsx                # Admin layout: independent header + main (NO root Navbar)
@@ -65,6 +67,8 @@ kost-app/
 │       │       │   └── route.ts      # POST /api/rooms/[id]/checkout
 │       │       └── tenants/
 │       │           └── route.ts      # GET /api/rooms/[id]/tenants (history)
+│       ├── kost/
+│       │   └── route.ts              # GET /api/kost, PATCH /api/kost (kost info + bank details)
 │       ├── bills/
 │       │   ├── route.ts              # GET /api/bills, POST /api/bills (upsert)
 │       │   └── [id]/
@@ -172,11 +176,14 @@ CREATE TABLE users (
 
 ```sql
 CREATE TABLE kosts (
-  id         VARCHAR(64)  PRIMARY KEY,
-  user_id    VARCHAR(64)  NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  name       VARCHAR(128) NOT NULL,
-  address    TEXT,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  id                   VARCHAR(64)  PRIMARY KEY,
+  user_id              VARCHAR(64)  NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name                 VARCHAR(128) NOT NULL,
+  address              TEXT,
+  bank_account_holder  VARCHAR(128),   -- configurable payment info
+  bank_name            VARCHAR(128),
+  bank_account_number  VARCHAR(64),
+  created_at           TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 ```
 
@@ -288,8 +295,9 @@ interface DatabaseData { rooms: Room[], bills: Bill[] }
 **Kosts:**
 | Function | Description |
 |---|---|
-| `getKostByUserId(userId)` | Get kost for an owner |
+| `getKostByUserId(userId)` | Get kost for an owner (incl. bank fields) |
 | `createKost(kost)` | Create a new kost |
+| `updateKost(kostId, data)` | Update kost name, address, and bank details |
 
 **Rooms:**
 | Function | Description |
@@ -356,6 +364,13 @@ interface OwnerWithKost extends User {
 
 ## 7. API Routes Reference
 
+### Kost Settings (owner-scoped)
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| `GET` | `/api/kost` | Owner | Get current owner's kost (incl. bank details) |
+| `PATCH` | `/api/kost` | Owner | Update kost name, address, bank details |
+
 ### Auth
 
 | Method | Path | Auth | Description |
@@ -405,6 +420,7 @@ interface OwnerWithKost extends User {
 | `/(owner)/rooms` | Client Component | fetch on mount |
 | `/(owner)/billing` | Client Component | fetch on mount + per-action |
 | `/(owner)/billing-list` | Client Component | fetch on filter change |
+| `/(owner)/settings` | Client Component | fetch on mount |
 | `/admin` | Client Component | fetch on mount |
 | `/login`, `/register` | Client Component | form-based |
 

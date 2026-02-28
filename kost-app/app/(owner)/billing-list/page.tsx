@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Room, Bill } from "@/lib/types";
+import { Room, Bill, Kost } from "@/lib/types";
 import {
   formatRupiah,
   formatNumber,
@@ -59,6 +59,7 @@ interface BillWithRoom extends Bill {
 
 export default function BillingListPage() {
   const [bills, setBills] = useState<BillWithRoom[]>([]);
+  const [kost, setKost] = useState<Kost | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedMonth, setSelectedMonth] = useState<string>("all");
   const [selectedYear, setSelectedYear] = useState(String(currentYear));
@@ -88,6 +89,11 @@ export default function BillingListPage() {
 
   useEffect(() => {
     fetchBills();
+    // Fetch kost data once for bank details
+    fetch("/api/kost")
+      .then((r) => r.json())
+      .then((data: Kost) => setKost(data))
+      .catch(() => {/* silent */});
   }, [fetchBills]);
 
   async function togglePaidStatus(bill: BillWithRoom) {
@@ -141,6 +147,9 @@ export default function BillingListPage() {
       kwh_used: bill.kwh_used,
       price_per_kwh: bill.room.price_per_kwh,
       total_amount: bill.total_amount,
+      bank_account_holder: kost?.bank_account_holder ?? null,
+      bank_name: kost?.bank_name ?? null,
+      bank_account_number: kost?.bank_account_number ?? null,
     });
 
     setGeneratedText(text);

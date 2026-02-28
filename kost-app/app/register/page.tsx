@@ -97,7 +97,7 @@ export default function RegisterPage() {
                 </div>
 
                 <div className="flex items-center gap-2 text-xs text-sidebar-foreground/40">
-                    <span>© 2025 KostManager</span>
+                    <span>© {new Date().getFullYear()} KostManager</span>
                     <span>·</span>
                     <span>v1.0</span>
                 </div>

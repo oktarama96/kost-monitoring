@@ -72,6 +72,9 @@ export function generateBillText(params: {
   kwh_used: number;
   price_per_kwh: number;
   total_amount: number;
+  bank_account_holder?: string | null;
+  bank_name?: string | null;
+  bank_account_number?: string | null;
 }): string {
   const {
     tenant_name,
@@ -85,10 +88,18 @@ export function generateBillText(params: {
     kwh_used,
     price_per_kwh,
     total_amount,
+    bank_account_holder,
+    bank_name,
+    bank_account_number,
   } = params;
 
   const electricityCost = kwh_used * price_per_kwh;
   const monthName = MONTH_NAMES[month];
+
+  const bankSection =
+    bank_account_holder || bank_name || bank_account_number
+      ? `\n${bank_account_holder ?? ""}\n${bank_name ?? ""}\n${bank_account_number ?? ""}`
+      : "";
 
   return `Halo ${tenant_name}, berikut rincian tagihan kamar ${room_name} untuk bulan ${monthName}/${year}:
 
@@ -103,10 +114,6 @@ Pemakaian Listrik:
 
 Total Tagihan: Rp ${formatNumber(total_amount)}
 
-Mohon untuk melakukan pembayaran sesuai jumlah di atas. Terima kasih!
-
-I KOMANG OKTARAMA BA
-Bank Mandiri
-1450013849266
+Mohon untuk melakukan pembayaran sesuai jumlah di atas. Terima kasih!${bankSection}
 `;
 }
