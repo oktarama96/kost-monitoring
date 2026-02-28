@@ -82,8 +82,8 @@ kost-app/
 │   ├── Providers.tsx                 # SessionProvider wrapper for NextAuth
 │   └── ui/                          # shadcn/ui primitives
 │       ├── badge.tsx, button.tsx, card.tsx, dialog.tsx
-│       ├── input.tsx, label.tsx, select.tsx, separator.tsx
-│       ├── sonner.tsx, table.tsx, textarea.tsx, accordion.tsx
+│       ├── form.tsx, input.tsx, label.tsx, select.tsx, separator.tsx
+│       ├── sonner.tsx, table.tsx, textarea.tsx
 │
 ├── lib/
 │   ├── db.ts                         # All database query + admin functions
@@ -272,8 +272,10 @@ interface Room { id, room_name, kost_id, base_price, monthly_fee, price_per_kwh 
 interface Tenant { id, room_id, name, phone?, check_in_date, check_out_date?, notes? }
 interface Bill { id, room_id, month, year, meter_start, meter_end, kwh_used, total_amount, status: BillStatus, tenant_snapshot_name? }
 interface RoomWithTenant extends Room { active_tenant?: Tenant | null }
-interface OwnerWithKost extends User { kost_id, kost_name, kost_address, room_count }
+interface DatabaseData { rooms: Room[], bills: Bill[] }
 ```
+
+> **Note:** `OwnerWithKost` is exported from `lib/db.ts` (not `lib/types.ts`) since it is tightly coupled to the admin DB query shape.
 
 ### `lib/db.ts` — Database Functions
 
@@ -315,25 +317,40 @@ interface OwnerWithKost extends User { kost_id, kost_name, kost_address, room_co
 | `updateBillStatus(id, status)` | Toggle paid/unpaid (blocked for expired) |
 | `deleteBill(id)` | Delete a bill |
 
+**Dashboard (legacy helper):**
+| Function | Description |
+|---|---|
+| `readData(kostId)` | Returns `{ rooms, bills }` for the dashboard server component |
+
 **Admin:**
 | Function | Description |
 |---|---|
-| `getAllOwners()` | List all owners with kost info and room count |
+| `getAllOwners()` | List all owners with kost info and room count; returns `OwnerWithKost[]` |
 | `hasSuperAdmin()` | Check if any superadmin exists |
 | `createOwnerUser(...)` | Create owner + kost in one call |
 | `updateOwnerUser(userId, data)` | Update owner + kost fields |
 | `deleteOwnerUser(userId)` | Delete owner + all data (cascade) |
 
+**Exported interface (defined in `lib/db.ts`):**
+```typescript
+interface OwnerWithKost extends User {
+  kost_id: string | null;
+  kost_name: string | null;
+  kost_address: string | null;
+  room_count: number;
+}
+```
+
 ### `lib/helpers.ts` — Business Logic
 
 | Function | Purpose |
 |---|---|
-| `calculateBillAmount(room, meterStart, meterEnd)` | Returns `{ kwh_used, total_amount }` |
+| `calculateBillAmount(kwhUsed, room)` | Returns `total_amount` (number): `base_price + monthly_fee + (kwhUsed × price_per_kwh)` |
 | `formatRupiah(amount)` | Formats as `Rp 1.500.000` |
 | `formatNumber(n)` | Dot-separated thousands |
-| `generateBillId(roomId, month, year)` | Deterministic `bill-{MM}{YYYY}-room{N}` |
-| `generateBillText(bill, room)` | Full Indonesian billing message |
-| `MONTH_NAMES` | Array of Indonesian month names |
+| `generateBillId(month, year, roomId)` | Deterministic `bill-{MM}{YYYY}-room{N}` |
+| `generateBillText(params)` | Full Indonesian billing message (copy-paste ready) |
+| `MONTH_NAMES` | `Record<number, string>` — 1-indexed Indonesian month names (1=Januari … 12=Desember) |
 
 ---
 

@@ -140,7 +140,7 @@ Bills have three possible statuses (`status` field — replaces the old `is_paid
   - **Active tenant info** (name, phone, check-in date) if occupied
   - Occupancy badge: "Dihuni" / "Kosong"
   - Actions: Edit room details, Check-out tenant, Check-in new tenant, Delete room
-- **Tenant history accordion**: Expandable list of all past tenants for a room.
+- **Tenant history toggle**: Expandable list of all past tenants for a room (custom toggle button, not shadcn accordion).
 - **Add Room dialog**: Optional initial tenant section (name, phone, check-in date).
 - **Checkout dialog**: Input for departure date (default today) + optional notes. Expires unpaid bills automatically.
 - **Check-in dialog**: Name, phone, check-in date (default today).
